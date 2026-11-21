@@ -1,0 +1,21 @@
+{
+  "name": "openbook-pdf-search-experiment",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "test": "node --env-file-if-exists=../../.env search.mjs",
+    "dev": "vite --host 127.0.0.1 --port 5174 --strictPort",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "6.5.438",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "vite": "8.3.8"
+  }
+}
