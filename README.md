@@ -42,6 +42,12 @@ npm.cmd run dev
 
 Open `http://127.0.0.1:5173` to see the welcome screen and connection status. Vite forwards `/api` to the API on port 8000 for development and local preview. Use **Check again** after starting or restoring a service. A deployed static build needs equivalent same-origin routing for `/api`.
 
+### Verify the connection
+
+With all three services running, run `Invoke-RestMethod http://127.0.0.1:8000/api/health` in PowerShell. Expect `status: ok` and `database: available`. The welcome screen should show **API and database connected**.
+
+To check the API outage state, stop Uvicorn with Ctrl+C and select **Check again**. The welcome screen should show **API health check unavailable**. To check the database outage state, keep Uvicorn running and run `docker compose stop db` from the repository root. After retrying, expect **API connected. Database unavailable.** Restore the database with `docker compose up -d --wait db`.
+
 To stop local services, press Ctrl+C in both windows and run `docker compose down` from the repository root. The database volume persists.
 
 ## Checks
@@ -62,4 +68,6 @@ npm.cmd run build
 Pop-Location
 ```
 
-GitHub Actions runs the same checks and verifies the baseline migration and health endpoint against PostgreSQL. See the [product specification](docs/product-spec.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md) for planned features.
+GitHub Actions runs the same checks and verifies the baseline migration and health endpoint against PostgreSQL. The [PDF search experiment](experiments/pdf-search/README.md) has its own dependencies and runs separately from the application.
+
+See the [product specification](docs/product-spec.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md) for planned features. The [Phase 1 progress log](docs/phase-1-progress.md) records verification evidence by issue.
