@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, useResource, useAction } from '../../app/api'
+import { Library } from '../references/Resources'
 import { Editor } from './Editor'
 import type { Course, Exam, Roster } from './model'
 
@@ -51,6 +52,7 @@ export function Lecturer() {
 
 function CourseView({ cid, back }: { cid: number; back: () => void }) {
   const [refresh, reload] = useState(0)
+  const [library, showLibrary] = useState(false)
   const [exam, setExam] = useState<Exam>()
   const [username, setUsername] = useState('')
   const [title, setTitle] = useState('')
@@ -76,68 +78,82 @@ function CourseView({ cid, back }: { cid: number; back: () => void }) {
     <section>
       <button onClick={back}>All courses</button>
       <h2>{roster.data?.name || 'Loading course…'}</h2>
-      <h3>Enrollment</h3>
-      <p>
-        {roster.data?.students.map((s) => s.username).join(', ') ||
-          'No enrolled students.'}
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void run(async () => {
-            await api('/courses/' + cid + '/enroll', 'POST', { username })
-            setUsername('')
-            reload((n) => n + 1)
-          })
-        }}
-      >
-        <label>
-          Student username
-          <input
-            required
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </label>
-        <button disabled={busy}>Enroll student</button>
-      </form>
-      <h3>Examinations</h3>
-      {!exams.data
-        ? 'Loading exams…'
-        : !exams.data.length && 'No examinations yet.'}
-      {exams.data?.map((x) => (
-        <p key={x.id}>
-          <button
-            onClick={() =>
-              void run(async () =>
-                setExam(await api<Exam>('/lecturer/exams/' + x.id)),
-              )
-            }
+      <nav aria-label="Course navigation">
+        <button aria-pressed={!library} onClick={() => showLibrary(false)}>
+          Exams and enrollment
+        </button>
+        <button aria-pressed={library} onClick={() => showLibrary(true)}>
+          Reference Library
+        </button>
+      </nav>
+      {library ? (
+        <Library cid={cid} />
+      ) : (
+        <>
+          <h3>Enrollment</h3>
+          <p>
+            {roster.data?.students.map((s) => s.username).join(', ') ||
+              'No enrolled students.'}
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void run(async () => {
+                await api('/courses/' + cid + '/enroll', 'POST', { username })
+                setUsername('')
+                reload((n) => n + 1)
+              })
+            }}
           >
-            {x.title}
-          </button>{' '}
-          {x.published_number ? 'Published' : 'Draft'}
-        </p>
-      ))}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void run(async () => {
-            setExam(await api<Exam>(path, 'POST', { title }))
-            setTitle('')
-          })
-        }}
-      >
-        <label>
-          New exam title
-          <input
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
-        <button disabled={busy}>Create draft</button>
-      </form>
+            <label>
+              Student username
+              <input
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </label>
+            <button disabled={busy}>Enroll student</button>
+          </form>
+          <h3>Examinations</h3>
+          {!exams.data
+            ? 'Loading exams…'
+            : !exams.data.length && 'No examinations yet.'}
+          {exams.data?.map((x) => (
+            <p key={x.id}>
+              <button
+                onClick={() =>
+                  void run(async () =>
+                    setExam(await api<Exam>('/lecturer/exams/' + x.id)),
+                  )
+                }
+              >
+                {x.title}
+              </button>{' '}
+              {x.published_number ? 'Published' : 'Draft'}
+            </p>
+          ))}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void run(async () => {
+                setExam(await api<Exam>(path, 'POST', { title }))
+                setTitle('')
+              })
+            }}
+          >
+            <label>
+              New exam title
+              <input
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </label>
+            <button disabled={busy}>Create draft</button>
+          </form>
+        </>
+      )}
       {(error || roster.error || exams.error) && (
         <p role="alert">{error || roster.error || exams.error}</p>
       )}

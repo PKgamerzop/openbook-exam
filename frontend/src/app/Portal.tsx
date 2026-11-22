@@ -26,8 +26,10 @@ export function Portal() {
     <>
       {user ? (
         <>
-          <p>
-            {user.username} · {user.role}{' '}
+          <div className="session-bar">
+            <span>
+              {user.username} · {user.role}
+            </span>
             <button
               disabled={busy}
               onClick={() =>
@@ -39,11 +41,11 @@ export function Portal() {
             >
               Sign out
             </button>
-          </p>
+          </div>
           {user.role === 'lecturer' ? <Lecturer /> : <Student />}
         </>
       ) : (
-        <section>
+        <section className="sign-in">
           <h2>Sign in</h2>
           <form
             onSubmit={(e) => {

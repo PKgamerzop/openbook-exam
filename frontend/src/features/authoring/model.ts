@@ -9,6 +9,8 @@ export type Draft = {
   title: string
   instructions: string
   rules: string
+  reference_versions?: number[]
+  pre_release?: boolean
   calculator: boolean
   opens_at: string | null
   closes_at: string | null

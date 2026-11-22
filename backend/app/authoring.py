@@ -34,6 +34,8 @@ class Draft(BaseModel):
     points_per_correct: Literal[1] = 1
     instructions: str = Field(default="", max_length=10000)
     rules: str = Field(default="", max_length=10000)
+    reference_versions: list[int] = Field(default_factory=list, max_length=200)
+    pre_release: bool = False
     calculator: bool = False
     opens_at: AwareDatetime | None = None
     closes_at: AwareDatetime | None = None
@@ -80,6 +82,19 @@ def editable(db, exam, number):
 
 
 def eligible(db, cid, draft):
+    if draft.reference_versions:
+        found = one(
+            db,
+            """SELECT count(*) AS n FROM reference_version v
+            JOIN reference_document d ON v.document_id=d.id
+            WHERE d.course_id=:c AND v.id=ANY(:ids)""",
+            c=cid,
+            ids=draft.reference_versions,
+        )
+        if found["n"] != len(draft.reference_versions):
+            raise HTTPException(
+                422, "Choose distinct reference versions from this course"
+            )
     selected = set(draft.students)
     roster = {
         r["student_id"]
@@ -189,6 +204,10 @@ def publish(eid: int, data: Publication, db: DB, uid: Lecturer):
     eligible(db, exam["course_id"], draft)
     editable(db, exam, data.edit_number)
     validate_publication(draft, store.now())
+    return publish_snapshot(db, eid, exam, draft)
+
+
+def publish_snapshot(db, eid, exam, draft):
     number = (exam["published_number"] or 0) + 1
     rows(
         db,
@@ -207,6 +226,14 @@ def publish(eid: int, data: Publication, db: DB, uid: Lecturer):
         e=eid,
         n=number,
         s=draft.students,
+    )
+    rows(
+        db,
+        """INSERT INTO exam_reference(exam_id,revision,version_id)
+        SELECT :e,:n,unnest(cast(:ids as integer[]))""",
+        e=eid,
+        n=number,
+        ids=draft.reference_versions,
     )
     return one(
         db,

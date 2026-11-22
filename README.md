@@ -58,6 +58,58 @@ To stop local services, press Ctrl+C in both windows and run `docker compose dow
 3. Add an MCQ with two options, select its correct option and enter a topic. Save, preview, then select **Validate and publish**. The published preview shows the effective revision even if you later save a different draft.
 4. Sign out and sign in as `student`. Open the assigned exam and read the rules. At opening, refresh availability and start. Return to the list and start again during the active attempt to verify the same attempt and deadline.
 
+## Exercise Phase 3
+
+Apply the migrations and install the backend and frontend dependencies using the Windows setup above. From the repository root, start the indexing worker in its own PowerShell window alongside FastAPI, PostgreSQL and Vite.
+
+```powershell
+Set-Location backend
+..\.venv\Scripts\python.exe -m app.reference_worker
+```
+
+Initialize the local demonstration from the **repository root** after migration. The coordinator generates the original PDF fixtures, provisions the lecturer and students, publishes both exams and finishes indexing before returning.
+
+```powershell
+.\scripts\Initialize-Demo.ps1 -Development
+```
+
+The coordinator generates a shared random password for these seven fictional accounts and encrypts it for the current Windows user using DPAPI. To copy it locally for sign-in, run the following from the repository root. Clear the clipboard after the walkthrough.
+
+```powershell
+$demoSecret = ConvertTo-SecureString (Get-Content -Raw .local-demo/credential.dpapi)
+([PSCredential]::new('demo_lecturer', $demoSecret)).GetNetworkCredential().Password | Set-Clipboard
+```
+
+| Account | Assignment |
+| --- | --- |
+| `demo_lecturer` | Owns Database Management Systems, Computer Science Engineering — Semester 5 |
+| `demo_student_01`, `demo_student_02` | Exam A |
+| `demo_student_03`, `demo_student_04` | Exam B |
+| `demo_student_05` | Both exams, each with a distinct reference list |
+| `demo_student_06` | Enrolled, neither exam |
+
+1. As the lecturer, open the DBMS course and **Reference Library**. Inspect the four two-page guides and preview **Scan**, the image-only document. Upload a local PDF, refresh its processing state, then organize it by folder and topics. Choose **New version of** to retain an earlier edition. A failed job exposes **Retry indexing**.
+2. Open an upcoming draft and select specific editions under **Permitted PDF versions**. Save, then validate and publish. Explicit pre-release allows assigned students to read before opening. During the scheduled window, both policies require a live attempt.
+3. As student 05, open Exam A and start it. Search for `deadlock`, click the result and check the viewer opens **Transactions Guide, page 2**. Return to assigned exams and open upcoming Exam B. Search for `hashjoin` to open **Query Optimization, page 2**. Searching the opposite exam for either term yields no matches.
+4. Sign in as student 06 and check the empty exam list. Students 01 and 03 each see only their assigned exam. The API tests also request the other exam directly, including its metadata, snippets and byte ranges.
+
+| Exam | PDF | Canonical query and expected one-based pages |
+| --- | --- | --- |
+| A | indexing-guide.pdf | `leaf` (1, 2) |
+| A | transactions-guide.pdf | `snapshot` (1), `deadlock` (2) |
+| B | query-optimization.pdf | `cardinality` (1), `hashjoin` (2) |
+| B | normalization-guide.pdf | `dependency` (1), `decomposition` (2) |
+
+A opens one hour before initial setup and B opens 24 hours afterward. Each window lasts two days. A rerun preserves credentials, dates, immutable versions and attempts. Preserve the encrypted credential file with this local environment. For a fresh schedule, use a fresh development database and a separate private storage directory. Seeding requires loopback, `OPENBOOK_LOCAL_HTTP=1`, and the database name `openbook` or `openbook_demo`. Existing unrelated usernames cause a rollback. The classroom seed and its publication clock are local utilities.
+
+### Storage and recovery
+
+Set `OPENBOOK_PDF_DIR` to an absolute private directory shared by the API and worker, or use the repository's ignored `.private-pdfs` directory. Restrict OS access to the service user. The default upload limit is 20 MiB (`OPENBOOK_PDF_MAX_BYTES`) and 200 pages (`OPENBOOK_PDF_MAX_PAGES`). Restart both processes after changing configuration. Encrypted and malformed files are rejected. Image-only PDFs are readable. Search uses extracted text and has no OCR.
+
+Restart the worker with the same command after interruption. A job becomes claimable after its 90-second lease expires. Each parse has a 30-second deadline and a monitored 384 MiB process memory limit. Accepted extraction output is bounded to 100,000 characters per page and two million per document. Repeated processing failures appear in the lecturer library. Inspect disk availability, file permissions and limits before retrying.
+
+Quiesce uploads and the worker for a coordinated PostgreSQL backup and private-directory snapshot. Restore both from the same point. Migration 0003 adds tables and a GIN index, with no rewrite of prior exam or attempt rows. Downgrading to 0002 discards reference bindings, jobs and indexes. Disk files remain private. Restore the matching backup to recover bindings before serving Phase 3 again. An interrupted upload can leave an unreferenced private file. Reconcile against stored UUIDs with services stopped before any manual cleanup.
+
 ## Checks
 
 Run these from the repository root after installing dependencies.

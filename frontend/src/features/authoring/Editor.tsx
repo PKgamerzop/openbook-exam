@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, useAction } from '../../app/api'
+import { api, useAction, useResource } from '../../app/api'
 import {
   localTime,
   moveQuestion,
@@ -8,6 +8,8 @@ import {
   type Question,
   type Roster,
 } from './model'
+
+import { libraryPath, type Reference } from '../references/Resources'
 
 function Preview({ draft }: { draft: Draft }) {
   return (
@@ -56,6 +58,8 @@ export function Editor({
   const [draft, setDraft] = useState(initial.draft)
   const [notice, setNotice] = useState('')
   const { busy, error, run } = useAction()
+  const refs = useResource<Reference[]>(libraryPath(roster.id))
+  const selected = draft.reference_versions ?? []
   const dirty = JSON.stringify(draft) !== JSON.stringify(exam.draft)
   function change(patch: Partial<Draft>) {
     setDraft({ ...draft, ...patch })
@@ -114,6 +118,37 @@ export function Editor({
             onChange={(e) => change({ title: e.target.value })}
           />
         </label>
+        <fieldset>
+          <legend>Permitted PDF versions</legend>
+          {refs.error && <p role="alert">{refs.error}</p>}
+          {!refs.data && !refs.error && <p>Loading references…</p>}
+          {refs.data?.length === 0 && <p>No PDFs in this course library.</p>}
+          {refs.data?.map((d) => (
+            <label key={d.id}>
+              <input
+                type="checkbox"
+                checked={selected.includes(d.id)}
+                onChange={(e) =>
+                  change({
+                    reference_versions: e.target.checked
+                      ? [...selected, d.id]
+                      : selected.filter((v) => v !== d.id),
+                  })
+                }
+              />
+              {d.title} · v{d.number} · {d.status}
+            </label>
+          ))}
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.pre_release ?? false}
+              onChange={(e) => change({ pre_release: e.target.checked })}
+            />{' '}
+            Release references to assigned students before opening
+          </label>
+          <p>During the examination, students need an active attempt.</p>
+        </fieldset>
         <label>
           Instructions
           <textarea

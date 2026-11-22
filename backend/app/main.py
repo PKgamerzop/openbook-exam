@@ -3,11 +3,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from app import access, attempts, authoring, courses
+from app import access, attempts, authoring, courses, references
 from app.db import check_database
 
 app = FastAPI(title="OpenBook API")
-for feature in (access, courses, authoring, attempts):
+for feature in (access, courses, authoring, attempts, references):
     app.include_router(feature.router)
 
 

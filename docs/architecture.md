@@ -40,6 +40,14 @@ Group routes, validation, and feature logic together. Put grading and result rel
 - **Upload and indexing (L03).** Validate the uploader's authorization and enforce file size and processing limits. Store originals privately and create an indexing job in PostgreSQL. The worker claims jobs with a lease, extracts text page by page under time and resource limits, and publishes page records and their search vectors atomically. Expired leases permit recovery after worker failure. Retrying an index job for a PDF version replaces its page index without duplicating rows. Report indexing status and failures to the lecturer.
 - **Viewing and search (S02–S04).** PDF.js opens PDFs through an authenticated endpoint that supports byte-range reads. Check student assignment, attempt ownership and active exam access, and permitted PDF version for every file or search request. Apply those checks before returning metadata, file content, or search snippets. PostgreSQL full-text search runs over page text with a GIN index on search vectors. Return the document identifier, one-based page number, and a plain-text snippet so the viewer can jump to the hit. A valid PDF with no extractable text is view-only. Store bookmarks and pins under the attempt and validate their PDF version and page on write.
 
+### Phase 3 implementation
+
+The course owns logical documents with a folder label and topic array. Each upload appends an immutable edition with a title, original filename, UUID storage key and page count. PostgreSQL foreign keys retain editions that published revisions depend on. Existing JSONB drafts default to an empty selection and restricted release.
+
+The raw upload route verifies course ownership, bounds streamed input and validates the PDF in a subprocess. The worker uses pypdf 7.1.1 (BSD-3-Clause, compatible with Python 3.14) and psutil for process monitoring. Jobs use PostgreSQL row locks, SKIP LOCKED, expiring leases and unique claim tokens. A worker publishes pages, updates status and retires its claim in one transaction. A replaced claim cannot publish stale results. One-based page numbers map directly to PDF.js navigation.
+
+The same exam access function guards the student list, search and file delivery. Pre-release ends at opening. Access then requires an attempt for that revision before its deadline and exam closing. Each byte-range request goes through the same checks. Students receive a narrow metadata projection. The search query uses the simple PostgreSQL dictionary, a stored tsvector, a GIN index and stable rank/version/page ordering. The React viewer renders snippets as text and destroys loading and render tasks on switch. See the [development walkthrough and recovery instructions](../README.md#exercise-phase-3).
+
 ## Security and optional AI
 
 ### Core examination pilot

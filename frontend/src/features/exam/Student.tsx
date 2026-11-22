@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { api, useAction, useResource } from '../../app/api'
 
+import { Resources } from '../references/Resources'
+
 type Details = {
+  pre_release?: boolean
   id: number
   title: string
   availability: string
@@ -44,9 +47,11 @@ export function Student() {
         !exams.data.length && <p>No examinations assigned.</p>
       )}
       {exams.data?.map((e) => (
-        <p key={e.id}>
+        <p className="exam-row" key={e.id}>
           <button onClick={() => select(e.id)}>{e.title}</button>{' '}
-          {e.availability}
+          <span className="processing-status" data-status={e.availability}>
+            {e.availability}
+          </span>
         </p>
       ))}
     </section>
@@ -82,6 +87,16 @@ function ExamDetails({ id, back }: { id: number; back: () => void }) {
           <h3>Permitted resources</h3>
           <p>{data.rules}</p>
           <p>Calculator {data.calculator ? 'permitted' : 'disabled'}</p>
+          {data.pre_release !== undefined && (
+            <p>
+              {data.pre_release ? 'Released before opening. ' : ''}During the
+              exam, references require an active attempt.
+            </p>
+          )}
+          {((data.pre_release && data.availability === 'upcoming') ||
+            (attempt && data.pre_release !== undefined)) && (
+            <Resources path={path + '/references'} />
+          )}
           {attempt ? (
             <article>
               <p>

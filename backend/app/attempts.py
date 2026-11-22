@@ -33,6 +33,11 @@ def summary(version, time):
                 "duration",
             )
         },
+        **(
+            {"pre_release": draft.get("pre_release", False)}
+            if draft.get("reference_versions")
+            else {}
+        ),
         "id": version["exam_id"],
         "availability": status,
     }
