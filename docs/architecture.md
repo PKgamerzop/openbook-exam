@@ -39,6 +39,14 @@ Group routes, validation, and feature logic together. Put grading and result rel
 
 Migration 0004 adds a response map keyed by frozen question position, an exam-wide private scratchpad, a state revision and finalization fields. Student writes acquire the attempt row lock and check the deadline and expected revision before updating. Submission and expiry finalize the same row. The final state is the durable answer snapshot for later grading. The background expiry command processes overdue rows with SKIP LOCKED. API reads can also finalize individual overdue attempts. Page marks use the frozen exam revision and the student's assignment, so marks made under the same pre-release revision carry into the attempt.
 
+### Phase 5 deterministic grading and release
+
+Migration 0005 adds attempt grades and release audit records. Its immutable SQL function assigns one point when a response matches the frozen option index. Empty responses count as unanswered. The finalization trigger and migration backfill call the same function. PostgreSQL commits the finalized attempt and grade together, including API expiry and the worker. One grade per attempt and one release per exam revision make repeats safe.
+
+Lecturers review their own course results. A release row records the actor and time after the exam closes and grades exist for all started attempts. Assigned students receive completion status before release and only their own assessment afterward. Score metrics use graded finalized attempts. Accuracy includes unanswered items in its denominator. Participation and completion use assigned students as the denominator. Multi-topic questions contribute once to each topic.
+
+Back up the database before the migration and pause grading writers during operational rollback. Downgrading to 0004 removes grades and release records while preserving attempts and answers. Reapplying 0005 deterministically rebuilds grades. Restore the matching backup for release history. A future scoring correction needs an audited migration with old and new derived values and approval before changing released results.
+
 ## PDF delivery and search
 
 - **Upload and indexing (L03).** Validate the uploader's authorization and enforce file size and processing limits. Store originals privately and create an indexing job in PostgreSQL. The worker claims jobs with a lease, extracts text page by page under time and resource limits, and publishes page records and their search vectors atomically. Expired leases permit recovery after worker failure. Retrying an index job for a PDF version replaces its page index without duplicating rows. Report indexing status and failures to the lecturer.

@@ -2,18 +2,30 @@ import { useState } from 'react'
 import { navigate, useRoute } from '../../app/route'
 import { api, useResource, useAction } from '../../app/api'
 import { Library } from '../references/Resources'
+import { LecturerResults } from '../results/Results'
 import { Editor } from './Editor'
 import type { Course, Exam, Roster } from './model'
 
 export function Lecturer() {
-  const route = /^\/courses\/(\d+)(?:\/(references)|\/exams\/(\d+))?$/.exec(
-    useRoute(),
-  )
+  const route =
+    /^\/courses\/(\d+)(?:\/(references)|\/exams\/(\d+)(\/results)?)?$/.exec(
+      useRoute(),
+    )
   const cid = Number(route?.[1])
   const [name, setName] = useState('')
   const [refresh, reload] = useState(0)
   const list = useResource<Course[]>('/courses', refresh)
   const { run, busy, error } = useAction()
+  if (cid && route?.[4]) {
+    const examPath = '/courses/' + cid + '/exams/' + route[3]
+    return (
+      <LecturerResults
+        key={route[3]}
+        eid={Number(route[3])}
+        back={() => navigate(examPath)}
+      />
+    )
+  }
   if (cid)
     return (
       <CourseView
