@@ -1,7 +1,11 @@
+import json
 from datetime import timedelta
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from conftest import client
+from test_lifecycle import QUESTION
 
 from app.db import get_engine
 from app.demo import USERS, seed
@@ -213,3 +217,64 @@ def test_upload_retry_and_freeze(dataset, monkeypatch, tmp_path):
     assert student.get(f"{prefix}/{scan['id']}/file").content == fixture("scan")
     hits = student.get(prefix + "/search?q=the").json()
     assert {h["id"] for h in hits} == {vid, first["id"]}
+
+
+def test_populated_phase_two_upgrade(pilot):
+    """An already-started attempt must survive upgrading its original 0002 schema."""
+    password, clock = pilot
+    cfg = Config("alembic.ini")
+    command.downgrade(cfg, "0002")
+    opened = clock[0] - timedelta(minutes=1)
+    closes = clock[0] + timedelta(hours=1)
+    with get_engine().begin() as db:
+        uid = one(db, "SELECT id FROM account WHERE username='learner'")["id"]
+        cid = one(
+            db,
+            """INSERT INTO course(name,owner_id) SELECT 'Legacy',id FROM account
+            WHERE username='teacher' RETURNING id""",
+        )["id"]
+        snapshot = dict(
+            title="Legacy exam",
+            questions=[QUESTION],
+            calculator=False,
+            instructions="Choose one",
+            rules="Paper",
+            duration=60,
+            students=[uid],
+            opens_at=opened.isoformat(),
+            closes_at=closes.isoformat(),
+        )
+        payload = json.dumps(snapshot)
+        eid = one(
+            db,
+            """INSERT INTO exam(course_id,draft) VALUES (:c,cast(:d as jsonb))
+            RETURNING id""",
+            c=cid,
+            d=payload,
+        )["id"]
+        rows(
+            db,
+            "INSERT INTO exam_version VALUES(:e,1,:o,:c,cast(:d as jsonb))",
+            e=eid,
+            o=opened,
+            c=closes,
+            d=payload,
+        )
+        rows(db, "UPDATE exam SET published_number=1 WHERE id=:e", e=eid)
+        rows(db, "INSERT INTO exam_assignment VALUES(:e,1,:s)", e=eid, s=uid)
+        aid = one(
+            db,
+            """INSERT INTO exam_attempt
+            (exam_id,version,student_id,started_at,deadline)
+            VALUES(:e,1,:s,:o,:c) RETURNING id""",
+            e=eid,
+            s=uid,
+            o=opened,
+            c=closes,
+        )["id"]
+    command.upgrade(cfg, "head")
+    session = login("learner", password)
+    base = f"/api/student/exams/{eid}"
+    assert session.get(base).json()["title"] == "Legacy exam"
+    assert session.get(base + "/references").json() == []
+    assert session.post(base + "/start").json()["id"] == aid
