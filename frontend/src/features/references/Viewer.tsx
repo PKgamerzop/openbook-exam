@@ -42,10 +42,11 @@ export function Viewer({
       .getPage(page)
       .then(async (p) => {
         if (!active || !canvas.current) return
+        const dimensions = p.getViewport({ scale: 1 })
         const viewport = p.getViewport({
           scale: Math.min(
             1.4,
-            1200 / Math.max(p.view[2] - p.view[0], p.view[3] - p.view[1], 1),
+            1200 / Math.max(dimensions.width, dimensions.height, 1),
           ),
         })
         canvas.current.width = viewport.width

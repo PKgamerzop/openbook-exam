@@ -24,7 +24,10 @@ def path_for(key):
     if root.is_relative_to(frontend):
         raise ValueError("PDF storage must be private")
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    return root / str(UUID(str(key)))
+    path = root / str(UUID(str(key)))
+    if path.resolve().parent != root or path.is_symlink():
+        raise ValueError("Invalid private file")
+    return path
 
 
 def parse(path, extract):
@@ -83,4 +86,5 @@ def inspect_pdf(path, extract=False):
 
 
 if __name__ == "__main__":
-    json.dump(parse(Path(sys.argv[1]), sys.argv[2] == "text"), sys.stdout)
+    data = parse(Path(sys.argv[1]), sys.argv[2] == "text")
+    sys.stdout.buffer.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))

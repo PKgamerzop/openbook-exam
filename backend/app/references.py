@@ -1,4 +1,5 @@
 import os
+from threading import BoundedSemaphore
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -14,6 +15,7 @@ from app.pdf_files import inspect_pdf, path_for
 from app.store import one, rows
 
 router = APIRouter(prefix="/api")
+validation_slots = BoundedSemaphore(2)
 COURSE = "/lecturer/courses/{cid}/references"
 EXAM = "/student/exams/{eid}/references"
 METADATA = """SELECT v.id,v.document_id,v.number,v.filename,v.title,v.size,v.pages,
@@ -65,9 +67,13 @@ async def upload(
     limit = int(os.getenv("OPENBOOK_PDF_MAX_BYTES", "20971520"))
     key = uuid4()
     path = path_for(key)
+    if not validation_slots.acquire(blocking=False):
+        raise HTTPException(429, "Upload processing is busy. Please retry.")
     size = 0
+    created = False
     try:
         with path.open("xb") as output:
+            created = True
             async for chunk in request.stream():
                 size += len(chunk)
                 if size > limit:
@@ -110,8 +116,11 @@ async def upload(
         db.commit()
         return dict(version)
     except BaseException:
-        path.unlink(missing_ok=True)
+        if created:
+            path.unlink(missing_ok=True)
         raise
+    finally:
+        validation_slots.release()
 
 
 @router.post(COURSE + "/{vid}/retry")
@@ -194,7 +203,13 @@ BINDING = """ JOIN exam_reference r ON r.version_id=v.id
 def resources(eid: int, uid: Student, db: DB):
     revision = permitted(db, eid, uid)
     return list(
-        rows(db, METADATA + BINDING + " ORDER BY v.title,v.id", e=eid, n=revision)
+        rows(
+            db,
+            "SELECT v.id,v.document_id,v.number,v.title,v.pages,v.status "
+            "FROM reference_version v" + BINDING + " ORDER BY v.title,v.id",
+            e=eid,
+            n=revision,
+        )
     )
 
 

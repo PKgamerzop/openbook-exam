@@ -9,6 +9,8 @@ import uvicorn
 from playwright.sync_api import expect, sync_playwright
 from starlette.staticfiles import StaticFiles
 
+from app.demo import COURSE, TITLES, USERS, seed
+from app.demo_fixtures import fixture
 from app.main import app
 
 
@@ -90,4 +92,53 @@ def test_lecturer_to_student(pilot, website):
         expect(page.get_by_text("Which number is even?", exact=True)).to_be_visible()
         expect(page.get_by_text("Four", exact=True)).to_be_visible()
         expect(page.get_by_text("Four (correct)", exact=True)).to_have_count(0)
+        browser.close()
+
+
+@pytest.mark.skipif(os.getenv("OPENBOOK_TEST_BROWSER") != "1", reason="Requires Chrome")
+def test_reference_browser(pilot, website, monkeypatch, tmp_path):
+    password, _ = pilot
+    monkeypatch.setenv("OPENBOOK_PDF_DIR", str(tmp_path))
+    seed(lambda: password)
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(channel="chrome")
+        page = browser.new_page()
+        page.goto(website)
+
+        def button(name):
+            return page.get_by_role("button", name=name, exact=True)
+
+        def login(name):
+            page.get_by_label("Username", exact=True).fill(name)
+            page.get_by_label("Password", exact=True).fill(password)
+            button("Sign in").click()
+
+        login(USERS[0])
+        button(COURSE).click()
+        button("Reference Library").click()
+        button("Preview Scan").click()
+        expect(page.get_by_label("Scan, page 1")).to_be_visible()
+        page.get_by_label("PDF file").set_input_files(
+            dict(
+                name="browser-upload.pdf",
+                mimeType="application/pdf",
+                buffer=fixture("transactions-guide"),
+            )
+        )
+        button("Upload PDF").click()
+        button("Preview browser-upload").click()
+        expect(page.get_by_label("browser-upload, page 1")).to_be_visible()
+        button("Sign out").click()
+        login(USERS[5])
+        button(TITLES[0]).click()
+        button("Start or resume attempt").click()
+        page.get_by_label("Search all permitted PDFs").fill("deadlock")
+        button("Search references").click()
+        button("Transactions Guide · page 2").click()
+        canvas = page.get_by_label("Transactions Guide, page 2")
+        expect(canvas).to_be_visible()
+        assert canvas.evaluate("""c => c.getContext('2d').getImageData(
+            0,0,c.width,c.height).data.some((v,i)=>i%4===0 && v<128)""")
+        button("Previous page").click()
+        expect(page.get_by_label("Transactions Guide, page 1")).to_be_visible()
         browser.close()

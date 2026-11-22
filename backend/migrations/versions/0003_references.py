@@ -39,7 +39,8 @@ def upgrade():
         );
         CREATE INDEX reference_search ON reference_page USING gin(vector);
         CREATE TABLE exam_reference (
-            exam_id integer, revision integer, version_id integer REFERENCES reference_version,
+            exam_id integer, revision integer,
+            version_id integer REFERENCES reference_version,
             PRIMARY KEY(exam_id,revision,version_id),
             FOREIGN KEY(exam_id,revision) REFERENCES exam_version
         );
