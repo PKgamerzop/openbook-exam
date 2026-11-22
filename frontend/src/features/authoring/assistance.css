@@ -1,0 +1,3 @@
+.authoring-assistance { margin: 1rem 0; padding: .85rem; border: 1px solid var(--border); border-radius: .5rem; }
+.authoring-assistance article { margin-top: .65rem; padding: .75rem; background: #f4f7f4; }
+.authoring-assistance blockquote { border-left: .2rem solid var(--accent); margin-left: 0; padding-left: .65rem; }

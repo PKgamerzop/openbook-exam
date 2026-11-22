@@ -12,6 +12,8 @@ import {
 
 import { libraryPath, type Reference } from '../references/Resources'
 
+import { Assistance } from './Assistance'
+
 function Preview({ draft }: { draft: Draft }) {
   return (
     <article>
@@ -119,6 +121,15 @@ export function Editor({
           <summary>View published exam</summary>
           <Preview draft={exam.published} />
         </details>
+      )}
+      {!exam.frozen && (
+        <Assistance
+          eid={exam.id}
+          questions={draft.questions}
+          edit={exam.edit_number}
+          dirty={dirty || busy}
+          apply={(i, stem) => question(i, { stem })}
+        />
       )}
       <fieldset disabled={busy || exam.frozen}>
         <legend>Exam settings</legend>
