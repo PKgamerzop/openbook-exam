@@ -118,14 +118,35 @@ export function Editor({
             onChange={(e) => change({ title: e.target.value })}
           />
         </label>
-        <fieldset><legend>Permitted PDF versions</legend>
+        <fieldset>
+          <legend>Permitted PDF versions</legend>
           {refs.error && <p role="alert">{refs.error}</p>}
           {!refs.data && !refs.error && <p>Loading references…</p>}
           {refs.data?.length === 0 && <p>No PDFs in this course library.</p>}
-          {refs.data?.map(d=><label key={d.id}><input type="checkbox" checked={selected.includes(d.id)}
-            onChange={e=>change({reference_versions:e.target.checked?[...selected,d.id]:selected.filter(v=>v!==d.id)})}/>
-            {d.title} · v{d.number} · {d.status}</label>)}
-          <label><input type="checkbox" checked={draft.pre_release ?? false} onChange={e=>change({pre_release:e.target.checked})}/> Release references to assigned students before opening</label>
+          {refs.data?.map((d) => (
+            <label key={d.id}>
+              <input
+                type="checkbox"
+                checked={selected.includes(d.id)}
+                onChange={(e) =>
+                  change({
+                    reference_versions: e.target.checked
+                      ? [...selected, d.id]
+                      : selected.filter((v) => v !== d.id),
+                  })
+                }
+              />
+              {d.title} · v{d.number} · {d.status}
+            </label>
+          ))}
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.pre_release ?? false}
+              onChange={(e) => change({ pre_release: e.target.checked })}
+            />{' '}
+            Release references to assigned students before opening
+          </label>
           <p>During the examination, students need an active attempt.</p>
         </fieldset>
         <label>
