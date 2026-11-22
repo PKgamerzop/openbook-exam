@@ -22,14 +22,23 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
 
   backend:
+    needs: frontend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
@@ -38,12 +47,15 @@ jobs:
       - run: python -m pip install -r requirements.txt -r requirements-dev.txt
       - run: python -m ruff check .
       - run: python -m ruff format --check .
-      - run: python -m pytest
       - name: Start PostgreSQL
         working-directory: .
         run: |
           cp .env.example .env
           docker compose up -d --wait db
+      - run: python -m pytest
+        env:
+          OPENBOOK_TEST_POSTGRES: "1"
+          OPENBOOK_TEST_BROWSER: "1"
       - name: Verify migration and database health
         run: |
           python -m alembic upgrade head
