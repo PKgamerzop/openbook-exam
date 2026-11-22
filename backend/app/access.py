@@ -3,6 +3,7 @@ import hmac
 import os
 import secrets
 from datetime import timedelta
+from threading import BoundedSemaphore
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/api")
 DB = Annotated[Connection, Depends(transaction, scope="function")]
 COOKIE = "openbook_session"
 TTL = timedelta(hours=8)
+password_checks = BoundedSemaphore(2)
 
 
 def derive(password, salt):
@@ -71,7 +73,12 @@ Student = Annotated[int, Depends(student)]
 def login(data: Login, request: Request, response: Response, db: DB):
     user = one(db, "SELECT * FROM account WHERE username=:u", u=data.username)
     salt, expected = (user["password_hash"] if user else "00." + "0" * 128).split(".")
-    actual = derive(data.password.get_secret_value(), bytes.fromhex(salt))
+    if not password_checks.acquire(blocking=False):
+        raise HTTPException(429, "Sign-in is busy. Try again shortly.")
+    try:
+        actual = derive(data.password.get_secret_value(), bytes.fromhex(salt))
+    finally:
+        password_checks.release()
     if not hmac.compare_digest(actual, expected) or not user:
         raise HTTPException(401, "Invalid username or password")
     token = secrets.token_urlsafe(32)

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, model_validator
@@ -31,6 +31,7 @@ class Question(BaseModel):
 
 class Draft(BaseModel):
     title: Name
+    points_per_correct: Literal[1] = 1
     instructions: str = Field(default="", max_length=10000)
     rules: str = Field(default="", max_length=10000)
     calculator: bool = False
@@ -138,11 +139,15 @@ def read(eid: int, db: DB, uid: Lecturer):
     exam = owned(db, uid, eid)
     version = one(
         db,
-        "SELECT snapshot FROM exam_version WHERE exam_id=:e AND number=:n",
+        "SELECT opens_at,snapshot FROM exam_version WHERE exam_id=:e AND number=:n",
         e=eid,
         n=exam["published_number"],
     )
-    return {**exam, "published": version["snapshot"] if version else None}
+    return {
+        **exam,
+        "published": version["snapshot"] if version else None,
+        "frozen": bool(version and store.now() >= version["opens_at"]),
+    }
 
 
 @router.put("/exams/{eid}")
