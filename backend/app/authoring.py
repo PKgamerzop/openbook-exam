@@ -204,6 +204,10 @@ def publish(eid: int, data: Publication, db: DB, uid: Lecturer):
     eligible(db, exam["course_id"], draft)
     editable(db, exam, data.edit_number)
     validate_publication(draft, store.now())
+    return publish_snapshot(db, eid, exam, draft)
+
+
+def publish_snapshot(db, eid, exam, draft):
     number = (exam["published_number"] or 0) + 1
     rows(
         db,
