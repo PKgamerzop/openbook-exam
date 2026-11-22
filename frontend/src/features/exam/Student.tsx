@@ -47,9 +47,11 @@ export function Student() {
         !exams.data.length && <p>No examinations assigned.</p>
       )}
       {exams.data?.map((e) => (
-        <p key={e.id}>
+        <p className="exam-row" key={e.id}>
           <button onClick={() => select(e.id)}>{e.title}</button>{' '}
-          {e.availability}
+          <span className="processing-status" data-status={e.availability}>
+            {e.availability}
+          </span>
         </p>
       ))}
     </section>

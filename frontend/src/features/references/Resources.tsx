@@ -35,14 +35,17 @@ export function Resources({ path }: { path: string }) {
   if (!data) return <p>Loading references…</p>
   if (!data.length) return <p>No references selected.</p>
   return (
-    <div>
+    <div className="reference-panel">
       <h3>Exam references</h3>
-      {data.map((d) => (
-        <button key={d.id} onClick={() => jump(d.id, 1)}>
-          {d.title} · v{d.number} · {d.status}
-        </button>
-      ))}
+      <div className="reference-actions">
+        {data.map((d) => (
+          <button key={d.id} onClick={() => jump(d.id, 1)}>
+            {d.title} · v{d.number} · {d.status}
+          </button>
+        ))}
+      </div>
       <form
+        className="reference-toolbar"
         onSubmit={(e) => {
           e.preventDefault()
           submit(query.trim())
@@ -139,9 +142,10 @@ export function Library({ cid }: { cid: number }) {
       .includes(filter.toLowerCase()),
   )
   return (
-    <article>
+    <article className="reference-library">
       <h3>Reference Library</h3>
       <form
+        className="upload-grid"
         onSubmit={(e) => {
           e.preventDefault()
           void run(async () => {
@@ -217,75 +221,83 @@ export function Library({ cid }: { cid: number }) {
         )}
         <button disabled={busy}>Upload PDF</button>
       </form>
-      <label>
-        Filter by title, filename, folder or topic
-        <input
-          type="search"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-      </label>
-      <button onClick={() => reload((n) => n + 1)}>Refresh library</button>
+      <div className="reference-toolbar">
+        <label>
+          Filter by title, filename, folder or topic
+          <input
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        </label>
+        <button onClick={() => reload((n) => n + 1)}>Refresh library</button>
+      </div>
       {(error || actionError) && <p role="alert">{error || actionError}</p>}
       {!data && !error && <p>Loading library…</p>}
       {docs?.length === 0 && <p>No matching documents.</p>}
-      {docs?.map((d) => (
-        <div className="library-entry" key={d.id}>
-          <h4>
-            {d.title} · v{d.number}
-          </h4>
-          <span className="processing-status">{d.status}</span>
-          <p>
-            {d.filename} · {Math.ceil(d.size / 1024)} KiB · {d.pages} pages
-          </p>
-          <p>
-            {d.folder} {d.topics.join(' · ')}
-          </p>
-          <button onClick={() => setPreview(d)}>Preview {d.title}</button>
-          {d.status === 'failed' && (
-            <button
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await api(path + '/' + d.id + '/retry', 'POST')
-                  reload((n) => n + 1)
-                })
-              }
-            >
-              Retry indexing
-            </button>
-          )}
-          <details>
-            <summary>Organize document</summary>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                const f = new FormData(e.currentTarget)
-                void run(async () => {
-                  await api(path + '/documents/' + d.document_id, 'PUT', {
-                    folder: f.get('folder'),
-                    topics: String(f.get('topics'))
-                      .split(',')
-                      .map((x) => x.trim())
-                      .filter(Boolean),
+      <div className="library-grid">
+        {docs?.map((d) => (
+          <div className="library-entry" key={d.id}>
+            <div className="library-entry-heading">
+              <h4>
+                {d.title} · v{d.number}
+              </h4>
+              <span className="processing-status" data-status={d.status}>
+                {d.status}
+              </span>
+            </div>
+            <p>
+              {d.filename} · {Math.ceil(d.size / 1024)} KiB · {d.pages} pages
+            </p>
+            <p>
+              {d.folder} {d.topics.join(' · ')}
+            </p>
+            <button onClick={() => setPreview(d)}>Preview {d.title}</button>
+            {d.status === 'failed' && (
+              <button
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    await api(path + '/' + d.id + '/retry', 'POST')
+                    reload((n) => n + 1)
                   })
-                  reload((n) => n + 1)
-                })
-              }}
-            >
-              <label>
-                Folder
-                <input required name="folder" defaultValue={d.folder} />
-              </label>
-              <label>
-                Topics, comma-separated
-                <input name="topics" defaultValue={d.topics.join(', ')} />
-              </label>
-              <button disabled={busy}>Save organization</button>
-            </form>
-          </details>
-        </div>
-      ))}
+                }
+              >
+                Retry indexing
+              </button>
+            )}
+            <details>
+              <summary>Organize document</summary>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const f = new FormData(e.currentTarget)
+                  void run(async () => {
+                    await api(path + '/documents/' + d.document_id, 'PUT', {
+                      folder: f.get('folder'),
+                      topics: String(f.get('topics'))
+                        .split(',')
+                        .map((x) => x.trim())
+                        .filter(Boolean),
+                    })
+                    reload((n) => n + 1)
+                  })
+                }}
+              >
+                <label>
+                  Folder
+                  <input required name="folder" defaultValue={d.folder} />
+                </label>
+                <label>
+                  Topics, comma-separated
+                  <input name="topics" defaultValue={d.topics.join(', ')} />
+                </label>
+                <button disabled={busy}>Save organization</button>
+              </form>
+            </details>
+          </div>
+        ))}
+      </div>
       {preview && (
         <Viewer
           key={preview.id}

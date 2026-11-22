@@ -116,6 +116,19 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
         login(USERS[0])
         button(COURSE).click()
         button("Reference Library").click()
+        for width, columns in [(1280, 2), (360, 1)]:
+            page.set_viewport_size({"width": width, "height": 800})
+            grid = page.locator(".library-grid")
+            expect(grid).to_be_visible()
+            assert (
+                len(
+                    grid.evaluate(
+                        "e => getComputedStyle(e).gridTemplateColumns.split(' ')"
+                    )
+                )
+                == columns
+            )
+            assert page.evaluate("document.documentElement.scrollWidth") == width
         button("Preview Scan").click()
         expect(page.get_by_label("Scan, page 1")).to_be_visible()
         page.get_by_label("PDF file").set_input_files(
@@ -137,6 +150,8 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
         button("Transactions Guide · page 2").click()
         canvas = page.get_by_label("Transactions Guide, page 2")
         expect(canvas).to_be_visible()
+        assert canvas.bounding_box()["width"] < 360
+        assert page.evaluate("document.documentElement.scrollWidth") == 360
         assert canvas.evaluate("""c => c.getContext('2d').getImageData(
             0,0,c.width,c.height).data.some((v,i)=>i%4===0 && v<128)""")
         button("Previous page").click()
