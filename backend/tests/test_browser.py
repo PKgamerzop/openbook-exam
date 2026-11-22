@@ -20,6 +20,7 @@ def screenshot(page, name):
     if directory:
         path = Path(directory)
         path.mkdir(parents=True, exist_ok=True)
+        page.evaluate("window.scrollTo(0, 0)")
         page.screenshot(path=path / (name + ".png"), full_page=True)
 
 
@@ -206,10 +207,12 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
         expect(page.locator(".reader output")).to_contain_text("of")
         expect(page.locator(".reader .textLayer .highlight").first).to_be_visible()
         screenshot(page, "07-reader-mobile")
-        page.set_viewport_size({"width": 1440, "height": 900})
-        screenshot(page, "08-workspace-desktop")
         button("Previous page").click()
-        expect(page.get_by_role("spinbutton", name="Page", exact=True)).to_have_value(
-            "1"
-        )
+        page_number = page.get_by_role("spinbutton", name="Page", exact=True)
+        expect(page_number).to_have_value("1")
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page_number.fill("2")
+        button("Go").click()
+        expect(page_number).to_have_value("2")
+        screenshot(page, "08-workspace-desktop")
         browser.close()

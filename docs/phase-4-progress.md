@@ -19,6 +19,14 @@ Phase 3 acceptance was confirmed against the merged PR and CI. Issues #21–31 a
 - [x] Idempotent ten-question Windows rehearsals.
 - [ ] Human review of screenshots and practical reader and workspace usability.
 
+## Verification and browser screenshots
+
+- Chrome captured [sign-in](phase-4-screenshots/01-login.png), [lecturer dashboard](phase-4-screenshots/02-lecturer-dashboard.png), [course and exams](phase-4-screenshots/03-course-and-exams.png), [mobile library](phase-4-screenshots/04-reference-library-mobile.png), and [student dashboard](phase-4-screenshots/05-student-dashboard.png).
+- Review the [mobile workspace](phase-4-screenshots/06-workspace-mobile.png), [mobile reader](phase-4-screenshots/07-reader-mobile.png), and [desktop split workspace](phase-4-screenshots/08-workspace-desktop.png).
+- Chrome verified upload, image-only preview, a simulated network failure and retry, refresh recovery of answers and flags, an exact unified-search jump, and in-document match highlighting.
+- The Windows rehearsal command produced the same two exam IDs on consecutive runs after upgrading to migration 0004. Existing demo exams remained available.
+- Verify practical usability in human review with a representative course corpus. The current browser evidence uses Chrome and synthetic documents.
+
 ## Implementation notes
 
 Student APIs project stems and options without returning grading keys. The attempt row is locked before applying saves or finalizing. Revision conflicts require the student to reload server-saved work or retry after a transient failure. A failed voluntary save keeps submission blocked until the student retries or explicitly reloads acknowledged work. The expiry worker and API use the same finalized state. An attempt's response JSON becomes read-only at finalization.
