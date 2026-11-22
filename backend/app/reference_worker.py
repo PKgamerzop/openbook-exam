@@ -1,11 +1,13 @@
 """Run with python -m app.reference_worker from backend."""
 
-import time
+import logging
 from uuid import uuid4
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db import get_engine
+from app.operational import heartbeat, shutdown_event, worker_logger
 from app.pdf_files import inspect_pdf, path_for
 from app.store import one, rows
 
@@ -57,10 +59,19 @@ def process_one(version_id=None):
                 [dict(v=vid, p=i, c=c) for i, c in enumerate(pages, 1)],
             )
         rows(db, "UPDATE reference_version SET status=:s WHERE id=:v", s=status, v=vid)
+    logging.getLogger("indexer").info("pdf_index_completed status=%s", status)
     return True
 
 
 if __name__ == "__main__":
-    while True:
-        if not process_one():
-            time.sleep(2)
+    logger = worker_logger("indexer")
+    stopped = shutdown_event()
+    while not stopped.is_set():
+        try:
+            processed = process_one()
+            heartbeat()
+            if processed:
+                continue
+        except SQLAlchemyError:
+            logger.warning("indexer_database_unavailable")
+        stopped.wait(2)

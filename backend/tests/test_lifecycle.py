@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Barrier
 
 import pytest
 from conftest import client
@@ -146,15 +147,17 @@ def test_exam_lifecycle(pilot):
     }
     cookie = learner.cookies.get("openbook_session")
 
-    def begin(_):
-        with client() as parallel:
-            parallel.cookies.set("openbook_session", cookie)
+    with client() as parallel, ThreadPoolExecutor(max_workers=60) as pool:
+        ready = Barrier(60, timeout=10)
+        parallel.cookies.set("openbook_session", cookie)
+
+        def begin(_):
+            ready.wait()
             response = parallel.post(start)
             assert response.status_code == 200, response.text
             return response.json()
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        attempts = list(pool.map(begin, range(4)))
+        attempts = list(pool.map(begin, range(60)))
     assert all(a == attempts[0] for a in attempts)
     assert set(attempts[0]) == {"id", "started_at", "deadline", "questions"}
     assert attempts[0]["questions"] == [

@@ -178,3 +178,7 @@ Pop-Location
 The integration suite needs PostgreSQL and permission to create temporary schemas. Each run exercises upgrade, downgrade and re-upgrade within its own schema. The browser check uses installed Google Chrome and the frontend build. CI runs both suites and checks the live health endpoint. The [PDF search experiment](experiments/pdf-search/README.md) has its own dependencies and runs separately.
 
 See the [product specification](docs/product-spec.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md) for planned features. The [Phase 1 progress log](docs/phase-1-progress.md) records verification evidence by issue.
+
+## Phase 6 HTTPS staging
+
+Follow [deployment](docs/deployment.md) to build a production-like local stack with Docker Compose. Use the [synthetic pilot runbook](docs/pilot-runbook.md) to rehearse the timed examination and measure load. See the [Phase 6 plan](docs/phase-6-plan.md), [progress](docs/phase-6-progress.md) and [release checklist](docs/release-checklist.md) for evidence and pilot gates.

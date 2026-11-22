@@ -69,3 +69,51 @@ jobs:
               assert response.status_code == 200, response.text
               assert response.json() == {"status": "ok", "database": "available"}
           PY
+
+  staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Build and start isolated HTTPS staging
+        run: |
+          mkdir -m 700 .phase6-local
+          db_password="$(openssl rand -hex 32)"
+          sed "s/replace-with-generated-password/$db_password/" .env.production.example > .env.staging
+          sed 's/8443/9443/g' .env.staging > .phase6-local/restore.env
+          docker compose -p p6-ci --env-file .env.staging -f compose.production.yaml build api gateway
+          docker compose -p p6-ci --env-file .env.staging -f compose.production.yaml up -d --no-build --wait
+          docker compose -p p6-ci --env-file .env.staging -f compose.production.yaml cp gateway:/data/caddy/pki/authorities/local/root.crt .phase6-local/stage.crt
+      - name: Seed fictional accounts and verify deployed behavior
+        run: |
+          openssl rand -hex 24 > .phase6-local/pilot.secret
+          docker compose -p p6-ci --env-file .env.staging -f compose.production.yaml exec -T api python -m app.pilot --synthetic-staging < .phase6-local/pilot.secret > .phase6-local/pilot.json
+          python scripts/phase6_smoke.py --ca .phase6-local/stage.crt --manifest .phase6-local/pilot.json --password-stdin < .phase6-local/pilot.secret > .phase6-local/source-smoke.txt
+      - name: Verify coordinated backup in a new Compose project
+        run: |
+          docker compose -p p6-ci-restore --env-file .phase6-local/restore.env -f compose.production.yaml build gateway
+          python scripts/phase6_backup.py backup .phase6-local/backup --project p6-ci --env-file .env.staging
+          python scripts/phase6_backup.py restore .phase6-local/backup --project p6-ci-restore --env-file .phase6-local/restore.env
+          docker compose -p p6-ci-restore --env-file .phase6-local/restore.env -f compose.production.yaml cp gateway:/data/caddy/pki/authorities/local/root.crt .phase6-local/restore.crt
+          python scripts/phase6_smoke.py --origin https://localhost:9443 --ca .phase6-local/restore.crt --manifest .phase6-local/pilot.json --password-stdin < .phase6-local/pilot.secret > .phase6-local/restore-smoke.txt
+          diff .phase6-local/source-smoke.txt .phase6-local/restore-smoke.txt
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - run: npm audit --omit=dev --audit-level=high
+        working-directory: frontend
+      - name: Audit Python runtime dependencies
+        run: |
+          python -m pip install pip-audit
+          python -m pip install --target .phase6-local/runtime -r backend/requirements.txt -c backend/constraints.production.txt
+          python -m pip_audit --path .phase6-local/runtime

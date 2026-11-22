@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import { useState } from 'react'
 import { navigate } from '../../app/route'
 import { api, useAction, useResource } from '../../app/api'
@@ -122,7 +124,7 @@ export function Editor({
           <Preview draft={exam.published} />
         </details>
       )}
-      {!exam.frozen && (
+      {!exam.frozen && import.meta.env.VITE_OPENBOOK_ASSISTANCE !== '0' && (
         <Assistance
           eid={exam.id}
           questions={draft.questions}

@@ -86,3 +86,9 @@ AI assistance (L05) is an optional lecturer action. Send only the lecturer-selec
 | Processing cost and peak load | Measure extraction time, index size, and search and answer-save latency. Test concurrent attempts while indexing representative PDFs. Record the corpus, concurrent attempt count, environment, latency percentiles, and observed failures. Use the results to set upload and pilot limits. |
 
 See the [product specification](product-spec.md) for acceptance criteria and the [roadmap](roadmap.md) for the feasibility and pilot gates.
+
+## Phase 6 deployment and deferred AI
+
+Use one Linux host with Caddy, the FastAPI modular monolith, PostgreSQL and two independent worker processes. The same API image runs migrations, the HTTP server and both workers. PostgreSQL and private PDFs have separate durable volumes. The API and workers share the PDF volume and only the gateway publishes a port. Backups pause all application writers before capturing both data sources.
+
+Model integration and AI quality evaluation are deferred until after Phase 6. The optional authoring code is preserved for development. Deployed builds omit its interface, deployed APIs omit its routes, and startup rejects an enabled AI provider or provider credential. Compose keeps the API and workers on internal networks. See the [Phase 6 plan](phase-6-plan.md) and [deployment guide](deployment.md).

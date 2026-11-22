@@ -1,12 +1,10 @@
 """Expire outstanding attempts in bounded batches after downtime."""
 
-import logging
-import time
-
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import store
 from app.db import get_engine
+from app.operational import heartbeat, shutdown_event, worker_logger
 from app.store import rows
 
 
@@ -31,10 +29,16 @@ def expire_batch():
 
 
 if __name__ == "__main__":
-    while True:
+    logger = worker_logger("expiry")
+    stopped = shutdown_event()
+    while not stopped.is_set():
         try:
-            if expire_batch() == 100:
+            count = expire_batch()
+            heartbeat()
+            if count:
+                logger.info("attempts_expired count=%d", count)
+            if count == 100:
                 continue
         except SQLAlchemyError:
-            logging.warning("Attempt expiry temporarily unavailable")
-        time.sleep(5)
+            logger.warning("expiry_database_unavailable")
+        stopped.wait(5)

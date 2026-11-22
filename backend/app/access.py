@@ -2,14 +2,17 @@ import hashlib
 import hmac
 import os
 import secrets
+from collections import deque
 from datetime import timedelta
-from threading import BoundedSemaphore
+from threading import BoundedSemaphore, Lock
+from time import monotonic
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import Connection
 
+from app.settings import deployed
 from app.store import now, one, rows, transaction
 
 router = APIRouter(prefix="/api")
@@ -17,6 +20,16 @@ DB = Annotated[Connection, Depends(transaction, scope="function")]
 COOKIE = "openbook_session"
 TTL = timedelta(hours=8)
 password_checks = BoundedSemaphore(2)
+failed_logins = deque(maxlen=2000)
+failure_lock = Lock()
+
+
+def login_throttled(client):
+    time = monotonic()
+    with failure_lock:
+        while failed_logins and time - failed_logins[0][1] >= 60:
+            failed_logins.popleft()
+        return sum(ip == client for ip, _ in failed_logins) >= 12
 
 
 def derive(password, salt):
@@ -71,6 +84,11 @@ Student = Annotated[int, Depends(student)]
 
 @router.post("/login")
 def login(data: Login, request: Request, response: Response, db: DB):
+    client = (
+        request.headers.get("x-openbook-client-ip", "")[:64] if deployed() else None
+    )
+    if client is not None and login_throttled(client):
+        raise HTTPException(429, "Too many failed sign-ins. Try again shortly.")
     user = one(db, "SELECT * FROM account WHERE username=:u", u=data.username)
     salt, expected = (user["password_hash"] if user else "00." + "0" * 128).split(".")
     if not password_checks.acquire(blocking=False):
@@ -80,6 +98,9 @@ def login(data: Login, request: Request, response: Response, db: DB):
     finally:
         password_checks.release()
     if not hmac.compare_digest(actual, expected) or not user:
+        if client is not None:
+            with failure_lock:
+                failed_logins.append((client, monotonic()))
         raise HTTPException(401, "Invalid username or password")
     token = secrets.token_urlsafe(32)
     time = now()
@@ -120,5 +141,11 @@ def logout(request: Request, response: Response, db: DB, user=Depends(identity))
         "DELETE FROM login_session WHERE digest=:key RETURNING 1",
         key=digest(request.cookies.get(COOKIE, "")),
     )
-    response.delete_cookie(COOKIE, path="/api")
+    response.delete_cookie(
+        COOKIE,
+        path="/api",
+        httponly=True,
+        samesite="strict",
+        secure=os.getenv("OPENBOOK_LOCAL_HTTP") != "1",
+    )
     return {"signed_out": True}

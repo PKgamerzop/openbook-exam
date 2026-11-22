@@ -180,6 +180,7 @@ export function Resources({ path }: { path: string }) {
           key={selected.sequence}
           title={selectedDoc.title}
           initialPage={selected.page}
+          focusOnOpen
           onPage={setActivePage}
           allowExport={exportPolicy.data?.allowed === true}
           url={'/api' + path + '/' + selected.id + '/file'}
@@ -204,7 +205,12 @@ function Hits({
   if (result.error) return <p role="alert">{result.error}</p>
   if (!result.data) return <p>Searching…</p>
   return (
-    <div>
+    <div
+      className="reference-hits"
+      role="region"
+      aria-label="Reference search results"
+      tabIndex={0}
+    >
       {!result.data.length && <p>No matching pages.</p>}
       {result.data.map((h) => (
         <div key={h.id + '-' + h.page}>
@@ -353,7 +359,12 @@ export function Library({ cid }: { cid: number }) {
             <p>
               {d.folder} {d.topics.join(' · ')}
             </p>
-            <button onClick={() => setPreview(d)}>Preview {d.title}</button>
+            <button
+              aria-pressed={preview?.id === d.id}
+              onClick={() => setPreview(d)}
+            >
+              Preview {d.title}
+            </button>
             {d.status === 'failed' && (
               <button
                 disabled={busy}
@@ -404,6 +415,7 @@ export function Library({ cid }: { cid: number }) {
           key={preview.id}
           url={'/api' + path + '/' + preview.id + '/file'}
           title={preview.title}
+          focusOnOpen
         />
       )}
     </article>

@@ -89,12 +89,14 @@ export function Viewer({
   initialPage = 1,
   onPage,
   allowExport = true,
+  focusOnOpen = false,
 }: {
   url: string
   title: string
   initialPage?: number
   onPage?: (page: number) => void
   allowExport?: boolean
+  focusOnOpen?: boolean
 }) {
   const root = useRef<HTMLElement>(null)
   const container = useRef<HTMLDivElement>(null)
@@ -112,6 +114,12 @@ export function Viewer({
   const [outline, setOutline] = useState<Outline>([])
   const [sidebar, setSidebar] = useState('')
   const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    if (!focusOnOpen) return
+    root.current?.focus({ preventScroll: true })
+    root.current?.scrollIntoView({ block: 'nearest' })
+  }, [focusOnOpen])
 
   useEffect(() => {
     const element = container.current!
@@ -224,6 +232,8 @@ export function Viewer({
     <article
       className={expanded ? 'reader reader-expanded' : 'reader'}
       ref={root}
+      tabIndex={focusOnOpen ? -1 : undefined}
+      aria-label={title + ' PDF reader'}
       onKeyDown={(e) => {
         if (e.key === 'Escape') setExpanded(false)
       }}

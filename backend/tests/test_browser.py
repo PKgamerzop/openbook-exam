@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import socket
 from datetime import timedelta
@@ -26,6 +27,7 @@ def screenshot(page, name):
 
 @pytest.fixture
 def website():
+    mimetypes.add_type("text/javascript", ".mjs")
     assets = StaticFiles(directory=Path("../frontend/dist"), html=True)
 
     async def website_app(scope, receive, send):
@@ -98,6 +100,7 @@ def test_lecturer_to_student(pilot, website):
         expect(page.get_by_text("Draft saved", exact=True)).to_be_visible()
         page.get_by_text("Preview draft", exact=True).click()
         expect(page.get_by_text("Four (correct)", exact=True)).to_be_visible()
+        screenshot(page, "09-mcq-editor")
         button("Validate and publish").click()
         expect(page.get_by_text("View published exam", exact=True)).to_be_visible()
         button("Sign out").click()
@@ -110,6 +113,19 @@ def test_lecturer_to_student(pilot, website):
         expect(page.get_by_text("Which number is even?", exact=True)).to_be_visible()
         expect(page.get_by_text("Four", exact=True)).to_be_visible()
         expect(page.get_by_text("Four (correct)", exact=True)).to_have_count(0)
+        page.get_by_role("radio", name="Four", exact=True).check()
+        expect(page.get_by_text("Saved", exact=True)).to_be_visible()
+        button("Review and submit").click()
+        screenshot(page, "10-submission-review")
+        button("Confirm submission").click()
+        expect(page.get_by_text("Exam submitted", exact=True)).to_be_visible()
+        button("Sign out").click()
+        login("teacher")
+        button("Mathematics").click()
+        button("Parity").click()
+        button("View exam results").click()
+        button("learner").click()
+        expect(page.get_by_text("1/1 (100%)", exact=True)).to_be_visible()
         browser.close()
 
 
@@ -155,9 +171,10 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
             assert page.evaluate("document.documentElement.scrollWidth") == width
         screenshot(page, "04-reference-library-mobile")
         button("Preview Scan").click()
+        expect(page.get_by_role("article", name="Scan PDF reader")).to_be_focused()
         expect(
             page.locator('.reader .page[data-page-number="1"] canvas')
-        ).to_be_visible()
+        ).to_be_visible(timeout=15000)
         page.get_by_label("PDF file").set_input_files(
             dict(
                 name="browser-upload.pdf",
@@ -194,6 +211,11 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
         page.get_by_label("Search all permitted PDFs").fill("deadlock")
         button("Search references").click()
         button("Transactions Guide · page 2").click()
+        expect(
+            page.get_by_role("article", name="Transactions Guide PDF reader")
+        ).to_be_focused()
+        hits = page.get_by_role("region", name="Reference search results")
+        expect(hits).to_be_visible()
         canvas = page.locator('.reader .page[data-page-number="2"] canvas')
         expect(canvas).to_be_visible()
         expect(page.get_by_role("spinbutton", name="Page", exact=True)).to_have_value(
