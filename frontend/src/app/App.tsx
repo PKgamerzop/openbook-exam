@@ -10,6 +10,10 @@ const statusText: Record<ConnectionStatus, string> = {
 }
 
 export function App() {
+  return <main className="app-shell"><Portal /></main>
+}
+
+export function Diagnostics() {
   const [status, setStatus] = useState<ConnectionStatus>('checking')
   const [attempt, setAttempt] = useState(0)
 
@@ -23,10 +27,8 @@ export function App() {
   }, [attempt])
 
   return (
-    <main>
-      <h1>Welcome to OpenBook</h1>
-      <p className="description">Computer-based open-book examination platform</p>
-      <Portal />
+    <details className="diagnostics">
+      <summary>Connection diagnostics</summary>
       <section aria-labelledby="connection">
         <h2 id="connection">Backend connection</h2>
         <p role="status" data-state={status}>{statusText[status]}</p>
@@ -40,6 +42,6 @@ export function App() {
           Check again
         </button>
       </section>
-    </main>
+    </details>
   )
 }

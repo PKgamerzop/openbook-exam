@@ -130,7 +130,9 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
             )
             assert page.evaluate("document.documentElement.scrollWidth") == width
         button("Preview Scan").click()
-        expect(page.get_by_label("Scan, page 1")).to_be_visible()
+        expect(
+            page.locator('.reader .page[data-page-number="1"] canvas')
+        ).to_be_visible()
         page.get_by_label("PDF file").set_input_files(
             dict(
                 name="browser-upload.pdf",
@@ -140,7 +142,9 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
         )
         button("Upload PDF").click()
         button("Preview browser-upload").click()
-        expect(page.get_by_label("browser-upload, page 1")).to_be_visible()
+        expect(
+            page.locator('.reader .page[data-page-number="1"] canvas')
+        ).to_be_visible()
         button("Sign out").click()
         login(USERS[5])
         button(TITLES[0]).click()
@@ -148,12 +152,16 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
         page.get_by_label("Search all permitted PDFs").fill("deadlock")
         button("Search references").click()
         button("Transactions Guide · page 2").click()
-        canvas = page.get_by_label("Transactions Guide, page 2")
+        canvas = page.locator('.reader .page[data-page-number="2"] canvas')
         expect(canvas).to_be_visible()
-        assert canvas.bounding_box()["width"] < 360
+        expect(page.get_by_role("spinbutton", name="Page", exact=True)).to_have_value(
+            "2"
+        )
         assert page.evaluate("document.documentElement.scrollWidth") == 360
         assert canvas.evaluate("""c => c.getContext('2d').getImageData(
             0,0,c.width,c.height).data.some((v,i)=>i%4===0 && v<128)""")
         button("Previous page").click()
-        expect(page.get_by_label("Transactions Guide, page 1")).to_be_visible()
+        expect(page.get_by_role("spinbutton", name="Page", exact=True)).to_have_value(
+            "1"
+        )
         browser.close()

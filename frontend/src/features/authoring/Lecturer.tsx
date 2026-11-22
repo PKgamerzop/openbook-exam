@@ -1,16 +1,18 @@
 import { useState } from 'react'
+import { navigate, useRoute } from '../../app/route'
 import { api, useResource, useAction } from '../../app/api'
 import { Library } from '../references/Resources'
 import { Editor } from './Editor'
 import type { Course, Exam, Roster } from './model'
 
 export function Lecturer() {
-  const [cid, select] = useState<number>()
+  const route = /^\/courses\/(\d+)(?:\/(references)|\/exams\/(\d+))?$/.exec(useRoute())
+  const cid = Number(route?.[1])
   const [name, setName] = useState('')
   const [refresh, reload] = useState(0)
   const list = useResource<Course[]>('/courses', refresh)
   const { run, busy, error } = useAction()
-  if (cid) return <CourseView cid={cid} back={() => select(undefined)} />
+  if (cid) return <CourseView key={cid} cid={cid} library={Boolean(route?.[2])} examId={Number(route?.[3])} />
   return (
     <section>
       <h2>Lecturer dashboard</h2>
@@ -21,7 +23,7 @@ export function Lecturer() {
           : !list.data.length && 'No courses yet.')}
       {list.data?.map((c) => (
         <p key={c.id}>
-          <button onClick={() => select(c.id)}>{c.name}</button>
+          <button onClick={() => navigate('/courses/' + c.id)}>{c.name}</button>
         </p>
       ))}
       <form
@@ -30,7 +32,7 @@ export function Lecturer() {
           void run(async () => {
             const c = await api<Course>('/courses', 'POST', { name })
             reload((n) => n + 1)
-            select(c.id)
+            navigate('/courses/' + c.id)
             setName('')
           })
         }}
@@ -50,10 +52,11 @@ export function Lecturer() {
   )
 }
 
-function CourseView({ cid, back }: { cid: number; back: () => void }) {
+function CourseView({ cid, library, examId }: { cid: number; library: boolean; examId: number }) {
+  const base = '/courses/' + cid
   const [refresh, reload] = useState(0)
-  const [library, showLibrary] = useState(false)
-  const [exam, setExam] = useState<Exam>()
+  const examResource = useResource<Exam>(examId ? '/lecturer/exams/' + examId : '') 
+  const exam = examId ? examResource.data : undefined
   const [username, setUsername] = useState('')
   const [title, setTitle] = useState('')
   const roster = useResource<Roster>('/courses/' + cid, refresh)
@@ -69,20 +72,20 @@ function CourseView({ cid, back }: { cid: number; back: () => void }) {
         initial={exam}
         roster={roster.data}
         back={() => {
-          setExam(undefined)
+          navigate(base)
           reload((n) => n + 1)
         }}
       />
     )
   return (
     <section>
-      <button onClick={back}>All courses</button>
+      <button onClick={() => navigate('/')}>All courses</button>
       <h2>{roster.data?.name || 'Loading course…'}</h2>
       <nav aria-label="Course navigation">
-        <button aria-pressed={!library} onClick={() => showLibrary(false)}>
+        <button aria-pressed={!library} onClick={() => navigate(base)}>
           Exams and enrollment
         </button>
-        <button aria-pressed={library} onClick={() => showLibrary(true)}>
+        <button aria-pressed={library} onClick={() => navigate(base + '/references')}>
           Reference Library
         </button>
       </nav>
@@ -122,11 +125,7 @@ function CourseView({ cid, back }: { cid: number; back: () => void }) {
           {exams.data?.map((x) => (
             <p key={x.id}>
               <button
-                onClick={() =>
-                  void run(async () =>
-                    setExam(await api<Exam>('/lecturer/exams/' + x.id)),
-                  )
-                }
+                onClick={() => navigate(base + '/exams/' + x.id)}
               >
                 {x.title}
               </button>{' '}
@@ -137,7 +136,8 @@ function CourseView({ cid, back }: { cid: number; back: () => void }) {
             onSubmit={(e) => {
               e.preventDefault()
               void run(async () => {
-                setExam(await api<Exam>(path, 'POST', { title }))
+                const created = await api<Exam>(path, 'POST', { title })
+                navigate(base + '/exams/' + created.id)
                 setTitle('')
               })
             }}
@@ -154,6 +154,7 @@ function CourseView({ cid, back }: { cid: number; back: () => void }) {
           </form>
         </>
       )}
+      {examId > 0 && examResource.error && <p role="alert">{examResource.error}</p>}
       {(error || roster.error || exams.error) && (
         <p role="alert">{error || roster.error || exams.error}</p>
       )}

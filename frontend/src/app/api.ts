@@ -31,6 +31,7 @@ export function useResource<T>(
     error?: string
   }>()
   useEffect(() => {
+    if (!path) return
     let active = true
     api<T>(path)
       .then((data) => active && setResult({ path, refresh, data }))
