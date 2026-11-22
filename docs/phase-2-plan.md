@@ -16,4 +16,3 @@ Foundation PR #9 is present on main at 8fa98c2. The Phase 1 tree matches the mer
 | P2-10 | Documentation and review | 01–09 | Record verification, local reproduction, outstanding gates and link the review PR and project tracker. |
 
 Use a single review branch. Keep immutable, complete revision snapshots and serialize publication and starts on the exam row. Review timing with a controllable clock and simultaneous PostgreSQL transactions. Exercise both roles in a browser before handoff.
-
