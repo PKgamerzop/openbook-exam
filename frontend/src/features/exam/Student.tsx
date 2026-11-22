@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { navigate, useRoute } from '../../app/route'
 import { api, useAction, useResource } from '../../app/api'
 
 import { Resources } from '../references/Resources'
@@ -22,15 +23,16 @@ type Attempt = {
 }
 
 export function Student() {
-  const [selected, select] = useState<number>()
+  const selected = Number(/^\/exams\/(\d+)$/.exec(useRoute())?.[1])
   const [refresh, reload] = useState(0)
   const exams = useResource<Details[]>('/student/exams', refresh)
   if (selected)
     return (
       <ExamDetails
+        key={selected}
         id={selected}
         back={() => {
-          select(undefined)
+          navigate('/')
           reload((n) => n + 1)
         }}
       />
@@ -48,7 +50,7 @@ export function Student() {
       )}
       {exams.data?.map((e) => (
         <p className="exam-row" key={e.id}>
-          <button onClick={() => select(e.id)}>{e.title}</button>{' '}
+          <button onClick={() => navigate('/exams/' + e.id)}>{e.title}</button>{' '}
           <span className="processing-status" data-status={e.availability}>
             {e.availability}
           </span>

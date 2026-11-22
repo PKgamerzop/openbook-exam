@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Lecturer } from '../features/authoring/Lecturer'
 import { Student } from '../features/exam/Student'
+import { Diagnostics } from './App'
+import { navigate } from './route'
 import { api, useAction } from './api'
 
 type User = { id: number; role: 'lecturer' | 'student'; username: string }
@@ -26,7 +28,8 @@ export function Portal() {
     <>
       {user ? (
         <>
-          <div className="session-bar">
+          <header className="session-bar">
+            <a className="wordmark" href="/" onClick={e => { e.preventDefault(); navigate("/") }}>OpenBook</a>
             <span>
               {user.username} · {user.role}
             </span>
@@ -36,16 +39,19 @@ export function Portal() {
                 void run(async () => {
                   await api('/logout', 'POST')
                   setUser(null)
+                  navigate('/')
                 })
               }
             >
               Sign out
             </button>
-          </div>
+          </header>
           {user.role === 'lecturer' ? <Lecturer /> : <Student />}
         </>
       ) : (
         <section className="sign-in">
+          <h1>OpenBook</h1>
+          <p className="description">Computer-based open-book examinations</p>
           <h2>Sign in</h2>
           <form
             onSubmit={(e) => {
@@ -81,6 +87,7 @@ export function Portal() {
             </label>
             <button disabled={busy}>Sign in</button>
           </form>
+          <Diagnostics />
         </section>
       )}
       {error && <p role="alert">{error}</p>}

@@ -109,3 +109,22 @@ nav [aria-pressed="false"] { color: var(--accent); background: #eaf2ed; }
 @media (max-width: 42rem) {
   .upload-grid, .library-grid { grid-template-columns: minmax(0, 1fr); }
 }
+.app-shell { max-width: 82rem; }
+.app-shell .session-bar { margin: 0 0 1rem; padding-bottom: .75rem; border-bottom: 1px solid var(--border); }
+.wordmark { color: var(--accent); font-size: 1.55rem; font-weight: 750; text-decoration: none; margin-right: auto; }
+.app-shell .sign-in { margin: clamp(1rem, 8vh, 6rem) auto 0; }
+.sign-in h2, .diagnostics { margin-top: 1rem; }
+.reader { margin-top: 1rem; border: 1px solid var(--border); border-radius: .75rem; padding: .75rem; background: white; }
+.reader-toolbar, .reader-find, .reader-toolbar form { display: flex; align-items: end; flex-wrap: wrap; gap: .4rem; }
+.reader-toolbar { margin: 0 0 .5rem; padding: .5rem; }
+.reader-toolbar label, .reader-find label, .reader-toolbar button, .reader-find button { margin: 0; }
+.reader-toolbar input { width: 5rem; }
+.reader-find { margin-bottom: .65rem; }
+.reader-find label { flex: 1 1 12rem; }
+.reader-panels { display: flex; background: #edf1ef; flex: 1; min-height: 0; }
+.reader-sidebar { flex: 0 0 auto; max-width: 35%; max-height: 65vh; overflow: auto; padding: .35rem; }
+.reader-thumbnails { display: grid; gap: .25rem; }
+.reader-thumbnails canvas { display: block; margin: auto; max-width: 100%; }
+.reader-scroll { position: relative; flex: 1; min-width: 0; min-height: 55vh; }
+.pdf-scroll-container { position: absolute; inset: 0; overflow: auto; }
+.reader-expanded { position: fixed; z-index: 10; inset: 0; height: 100dvh; margin: 0; display: flex; flex-direction: column; overflow: auto; }
