@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Portal } from './Portal'
 import { checkBackend, type ConnectionStatus } from './health'
 
 const statusText: Record<ConnectionStatus, string> = {
@@ -25,6 +26,7 @@ export function App() {
     <main>
       <h1>Welcome to OpenBook</h1>
       <p className="description">Computer-based open-book examination platform</p>
+      <Portal />
       <section aria-labelledby="connection">
         <h2 id="connection">Backend connection</h2>
         <p role="status" data-state={status}>{statusText[status]}</p>

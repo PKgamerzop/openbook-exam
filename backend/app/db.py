@@ -18,7 +18,12 @@ def get_engine() -> Engine:
         port=int(os.getenv("POSTGRES_PORT", "5432")),
         database=os.environ["POSTGRES_DB"],
     )
-    return create_engine(url, connect_args={"connect_timeout": 2}, pool_pre_ping=True)
+    return create_engine(
+        url,
+        connect_args={"connect_timeout": 2},
+        pool_pre_ping=True,
+        hide_parameters=True,
+    )
 
 
 def check_database() -> None:

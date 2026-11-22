@@ -42,6 +42,16 @@ Group routes, validation, and feature logic together. Put grading and result rel
 
 ## Security and optional AI
 
+### Core examination pilot
+
+Local accounts use per-user random salts and scrypt (N=131072, r=8, p=1). Database-backed sessions allow immediate logout and avoid a client-held bearer token in JavaScript. The browser holds an opaque 256-bit random token in an HttpOnly, SameSite=Strict cookie scoped to /api. The database holds its SHA-256 digest and an eight-hour expiry. Login rotates the current browser session. Mutations require a custom header, cross-site browser mutations are rejected, and the API enables no cross-origin access. Serve the application and API on the same HTTPS origin. Loopback development can explicitly enable HTTP cookies. Institutional SSO remains a deployment decision.
+
+Courses belong to one lecturer. Lecturers enroll existing students by username. Course-scoped catalog entries retain reusable topic and objective names. The ordered MCQs, options, single correct index, tags, one-point rule, policy settings and candidate assignments are validated together as a draft and stored as JSONB. Each publication copies that aggregate to a new revision and materializes its assigned students as indexed relational rows. A composite foreign key ties each attempt to an assigned revision. A unique constraint limits each student to one attempt per exam.
+
+The API locks the exam row and checks both the expected edit number and the effective revision's opening time before replacing a draft or publishing. Drafts can be incomplete. Publication requires instructions, resource rules, a positive duration, a future opening before closing, an eligible assignment and a valid question set. The active revision stays effective until explicitly republished. At opening it becomes final without depending on a scheduled job. Student endpoints project permitted fields explicitly. The start transaction rechecks assignment and UTC time after locking and returns the stored attempt on eligible retries. Its deadline is the earlier of exam closing and start plus duration.
+
+Migration 0002 adds tables to the empty 0001 baseline and needs no backfill. Downgrading to 0001 removes Phase 2 data. Back up the database before any operational downgrade and restore that backup to recover populated records. The automated rollback check runs in a new disposable schema.
+
 Authorize access in FastAPI on every protected route. Scope lecturer operations to the lecturer's exams and references. Scope student operations to the student's assignments and attempts. Exclude answer keys, other students' work, and unreleased results from student responses. Keep uploaded files private, use TLS in deployment, supply secrets through environment configuration, and log operational events without recording student answers, scratchpad text, or answer keys.
 
 AI assistance (L05) is an optional lecturer action. Send only the lecturer-selected authored content needed for the request and exclude student data. Treat generated text as draft material. Applying it requires an explicit lecturer action, and publishing uses the normal exam workflow. A provider failure leaves saved content available for editing.
