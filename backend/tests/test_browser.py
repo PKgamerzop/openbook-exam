@@ -7,6 +7,7 @@ from threading import Thread
 import pytest
 import uvicorn
 from playwright.sync_api import expect, sync_playwright
+from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
 from app.demo import COURSE, TITLES, USERS, seed
@@ -14,13 +15,29 @@ from app.demo_fixtures import fixture
 from app.main import app
 
 
+def screenshot(page, name):
+    directory = os.getenv("OPENBOOK_SCREENSHOTS")
+    if directory:
+        path = Path(directory)
+        path.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=path / (name + ".png"), full_page=True)
+
+
 @pytest.fixture
 def website():
     assets = StaticFiles(directory=Path("../frontend/dist"), html=True)
 
     async def website_app(scope, receive, send):
-        handler = app if scope["path"].startswith("/api/") else assets
-        await handler(scope, receive, send)
+        path = scope["path"]
+        if path.startswith("/api/"):
+            await app(scope, receive, send)
+        elif path.startswith(("/courses/", "/exams/")) or path == "/favicon.ico":
+            if path == "/favicon.ico":
+                await Response(status_code=204)(scope, receive, send)
+            else:
+                await assets({**scope, "path": "/"}, receive, send)
+        else:
+            await assets(scope, receive, send)
 
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -113,8 +130,14 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
             page.get_by_label("Password", exact=True).fill(password)
             button("Sign in").click()
 
+        expect(button("Sign in")).to_be_visible()
+        screenshot(page, "01-login")
         login(USERS[0])
+        expect(button(COURSE)).to_be_visible()
+        screenshot(page, "02-lecturer-dashboard")
         button(COURSE).click()
+        expect(button(TITLES[0])).to_be_visible()
+        screenshot(page, "03-course-and-exams")
         button("Reference Library").click()
         for width, columns in [(1280, 2), (360, 1)]:
             page.set_viewport_size({"width": width, "height": 800})
@@ -129,8 +152,11 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
                 == columns
             )
             assert page.evaluate("document.documentElement.scrollWidth") == width
+        screenshot(page, "04-reference-library-mobile")
         button("Preview Scan").click()
-        expect(page.locator('.reader .page[data-page-number="1"] canvas')).to_be_visible()
+        expect(
+            page.locator('.reader .page[data-page-number="1"] canvas')
+        ).to_be_visible()
         page.get_by_label("PDF file").set_input_files(
             dict(
                 name="browser-upload.pdf",
@@ -140,20 +166,50 @@ def test_reference_browser(pilot, website, monkeypatch, tmp_path):
         )
         button("Upload PDF").click()
         button("Preview browser-upload").click()
-        expect(page.locator('.reader .page[data-page-number="1"] canvas')).to_be_visible()
+        expect(
+            page.locator('.reader .page[data-page-number="1"] canvas')
+        ).to_be_visible()
         button("Sign out").click()
         login(USERS[5])
+        expect(button(TITLES[0])).to_be_visible()
+        screenshot(page, "05-student-dashboard")
         button(TITLES[0]).click()
         button("Start or resume attempt").click()
+        expect(page.get_by_role("timer")).to_be_visible()
+        page.route("**/attempt/questions/0", lambda route: route.abort())
+        option = page.get_by_role("radio").first
+        option.check()
+        expect(page.get_by_text("Save failed.", exact=False)).to_be_visible()
+        page.unroute("**/attempt/questions/0")
+        button("Retry saves").click()
+        expect(page.get_by_text("Saved", exact=True)).to_be_visible()
+        button("Flag question").click()
+        expect(page.get_by_text("Saved", exact=True)).to_be_visible()
+        page.reload()
+        expect(page.get_by_role("radio").first).to_be_checked()
+        expect(button("Remove flag")).to_be_visible()
+        screenshot(page, "06-workspace-mobile")
+        button("References").click()
         page.get_by_label("Search all permitted PDFs").fill("deadlock")
         button("Search references").click()
         button("Transactions Guide · page 2").click()
         canvas = page.locator('.reader .page[data-page-number="2"] canvas')
         expect(canvas).to_be_visible()
-        expect(page.get_by_role("spinbutton", name="Page", exact=True)).to_have_value("2")
+        expect(page.get_by_role("spinbutton", name="Page", exact=True)).to_have_value(
+            "2"
+        )
         assert page.evaluate("document.documentElement.scrollWidth") == 360
         assert canvas.evaluate("""c => c.getContext('2d').getImageData(
             0,0,c.width,c.height).data.some((v,i)=>i%4===0 && v<128)""")
+        page.get_by_label("Find in this PDF").fill("deadlock")
+        button("Next match").click()
+        expect(page.locator(".reader output")).to_contain_text("of")
+        expect(page.locator(".reader .textLayer .highlight").first).to_be_visible()
+        screenshot(page, "07-reader-mobile")
+        page.set_viewport_size({"width": 1440, "height": 900})
+        screenshot(page, "08-workspace-desktop")
         button("Previous page").click()
-        expect(page.get_by_role("spinbutton", name="Page", exact=True)).to_have_value("1")
+        expect(page.get_by_role("spinbutton", name="Page", exact=True)).to_have_value(
+            "1"
+        )
         browser.close()

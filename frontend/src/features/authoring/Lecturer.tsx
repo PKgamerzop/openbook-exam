@@ -6,13 +6,23 @@ import { Editor } from './Editor'
 import type { Course, Exam, Roster } from './model'
 
 export function Lecturer() {
-  const route = /^\/courses\/(\d+)(?:\/(references)|\/exams\/(\d+))?$/.exec(useRoute())
+  const route = /^\/courses\/(\d+)(?:\/(references)|\/exams\/(\d+))?$/.exec(
+    useRoute(),
+  )
   const cid = Number(route?.[1])
   const [name, setName] = useState('')
   const [refresh, reload] = useState(0)
   const list = useResource<Course[]>('/courses', refresh)
   const { run, busy, error } = useAction()
-  if (cid) return <CourseView key={cid} cid={cid} library={Boolean(route?.[2])} examId={Number(route?.[3])} />
+  if (cid)
+    return (
+      <CourseView
+        key={cid}
+        cid={cid}
+        library={Boolean(route?.[2])}
+        examId={Number(route?.[3])}
+      />
+    )
   return (
     <section>
       <h2>Lecturer dashboard</h2>
@@ -52,10 +62,20 @@ export function Lecturer() {
   )
 }
 
-function CourseView({ cid, library, examId }: { cid: number; library: boolean; examId: number }) {
+function CourseView({
+  cid,
+  library,
+  examId,
+}: {
+  cid: number
+  library: boolean
+  examId: number
+}) {
   const base = '/courses/' + cid
   const [refresh, reload] = useState(0)
-  const examResource = useResource<Exam>(examId ? '/lecturer/exams/' + examId : '') 
+  const examResource = useResource<Exam>(
+    examId ? '/lecturer/exams/' + examId : '',
+  )
   const exam = examId ? examResource.data : undefined
   const [username, setUsername] = useState('')
   const [title, setTitle] = useState('')
@@ -85,7 +105,10 @@ function CourseView({ cid, library, examId }: { cid: number; library: boolean; e
         <button aria-pressed={!library} onClick={() => navigate(base)}>
           Exams and enrollment
         </button>
-        <button aria-pressed={library} onClick={() => navigate(base + '/references')}>
+        <button
+          aria-pressed={library}
+          onClick={() => navigate(base + '/references')}
+        >
           Reference Library
         </button>
       </nav>
@@ -124,9 +147,7 @@ function CourseView({ cid, library, examId }: { cid: number; library: boolean; e
             : !exams.data.length && 'No examinations yet.'}
           {exams.data?.map((x) => (
             <p key={x.id}>
-              <button
-                onClick={() => navigate(base + '/exams/' + x.id)}
-              >
+              <button onClick={() => navigate(base + '/exams/' + x.id)}>
                 {x.title}
               </button>{' '}
               {x.published_number ? 'Published' : 'Draft'}
@@ -154,7 +175,9 @@ function CourseView({ cid, library, examId }: { cid: number; library: boolean; e
           </form>
         </>
       )}
-      {examId > 0 && examResource.error && <p role="alert">{examResource.error}</p>}
+      {examId > 0 && examResource.error && (
+        <p role="alert">{examResource.error}</p>
+      )}
       {(error || roster.error || exams.error) && (
         <p role="alert">{error || roster.error || exams.error}</p>
       )}

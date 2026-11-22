@@ -110,6 +110,33 @@ Restart the worker with the same command after interruption. A job becomes claim
 
 Quiesce uploads and the worker for a coordinated PostgreSQL backup and private-directory snapshot. Restore both from the same point. Migration 0003 adds tables and a GIN index, with no rewrite of prior exam or attempt rows. Downgrading to 0002 discards reference bindings, jobs and indexes. Disk files remain private. Restore the matching backup to recover bindings before serving Phase 3 again. An interrupted upload can leave an unreferenced private file. Reconcile against stored UUIDs with services stopped before any manual cleanup.
 
+## Exercise Phase 4
+
+From the repository directory, apply migration 0004 in the backend and initialize the Phase 3 demo if it is new. Then create the Phase 4 rehearsals.
+
+```powershell
+Push-Location backend
+..\.venv\Scripts\python.exe -m alembic upgrade head
+Pop-Location
+.\scripts\Initialize-Demo.ps1 -Development
+Push-Location backend
+..\.venv\Scripts\python.exe -m app.rehearsal --development
+Pop-Location
+```
+
+Start the API, frontend and PDF worker as above. In another PowerShell window at the repository root, start automatic expiry processing.
+
+```powershell
+Set-Location backend
+..\.venv\Scripts\python.exe -m app.attempt_expiry
+```
+
+Use the Phase 3 demo credentials. Sign in as `demo_student_05` and open **DBMS Rehearsal — Timed workspace**. The 15-minute exam enables the calculator. Answer one of the ten questions, flag another, write a scratchpad note and pin a PDF page. Wait for **Saved** and reload the page. The answers, flags, note, and saved pages should return. Keep a question unanswered, open **Review and submit**, and verify the counts before confirming. The receipt reports the recorded answer count.
+
+Use **DBMS Rehearsal — Calculator disabled** for the two-minute expiry case. Save an answer and let the timer reach zero. The expiry receipt records saved answers. To rehearse reconnection, take the browser offline after the workspace loads, edit a response and check for **Save failed**. Reconnect and use **Retry saves** while the time window remains open. Each seed run reuses the same rehearsal exams and preserves attempts.
+
+Deployments need same-origin API routing and an SPA fallback that serves `index.html` for frontend routes such as `/courses/123` and `/exams/123`. Keep `/api` and asset paths outside that fallback. Connection diagnostics are available on the sign-in page.
+
 ## Checks
 
 Run these from the repository root after installing dependencies.

@@ -36,6 +36,7 @@ class Draft(BaseModel):
     rules: str = Field(default="", max_length=10000)
     reference_versions: list[int] = Field(default_factory=list, max_length=200)
     pre_release: bool = False
+    allow_reference_export: bool = False
     calculator: bool = False
     opens_at: AwareDatetime | None = None
     closes_at: AwareDatetime | None = None

@@ -29,7 +29,16 @@ export function Portal() {
       {user ? (
         <>
           <header className="session-bar">
-            <a className="wordmark" href="/" onClick={e => { e.preventDefault(); navigate("/") }}>OpenBook</a>
+            <a
+              className="wordmark"
+              href="/"
+              onClick={(e) => {
+                e.preventDefault()
+                navigate('/')
+              }}
+            >
+              OpenBook
+            </a>
             <span>
               {user.username} · {user.role}
             </span>

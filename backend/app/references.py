@@ -182,7 +182,7 @@ def permitted(db, eid, uid):
     if version["opens_at"] <= time < version["closes_at"] and one(
         db,
         """SELECT id FROM exam_attempt WHERE exam_id=:e AND version=:n AND student_id=:s
-            AND started_at<=:t AND deadline>:t""",
+            AND finalized_at IS NULL AND started_at<=:t AND deadline>:t""",
         e=eid,
         n=version["number"],
         s=uid,
@@ -256,3 +256,96 @@ def student_file(eid: int, vid: int, request: Request, uid: Student, db: DB):
         ),
         request,
     )
+
+
+class PageMark(BaseModel):
+    name: str = Field(default="", max_length=100, pattern=r"^[^\x00]*$")
+    pinned: bool = False
+
+
+@router.get(EXAM + "/export-policy")
+def export_policy(eid: int, uid: Student, db: DB):
+    revision = permitted(db, eid, uid)
+    published = one(
+        db,
+        """SELECT snapshot FROM exam_version
+        WHERE exam_id=:e AND number=:n""",
+        e=eid,
+        n=revision,
+    )
+    return {"allowed": published["snapshot"].get("allow_reference_export", False)}
+
+
+@router.get(EXAM + "/marks")
+def marks(eid: int, uid: Student, db: DB):
+    return list(
+        rows(
+            db,
+            """SELECT version_id,page,name,pinned FROM exam_page_mark
+        WHERE exam_id=:e AND revision=:n AND student_id=:s
+        ORDER BY version_id,pinned DESC,page""",
+            e=eid,
+            n=permitted(db, eid, uid),
+            s=uid,
+        )
+    )
+
+
+@router.put(EXAM + "/marks/{vid}/{page}")
+def save_mark(eid: int, vid: int, page: int, data: PageMark, db: DB, uid: Student):
+    one(db, "SELECT id FROM exam WHERE id=:e FOR UPDATE", e=eid)
+    n = permitted(db, eid, uid)
+    one(
+        db,
+        """SELECT id FROM exam_attempt WHERE exam_id=:e AND student_id=:s
+        FOR UPDATE""",
+        e=eid,
+        s=uid,
+    )
+    n = permitted(db, eid, uid)
+    available = one(
+        db,
+        "SELECT v.pages FROM reference_version v" + BINDING + " AND v.id=:v",
+        e=eid,
+        n=n,
+        v=vid,
+    )
+    if not available or not 1 <= page <= available["pages"]:
+        raise HTTPException(404, "Page unavailable")
+    return one(
+        db,
+        """INSERT INTO exam_page_mark VALUES (:e,:n,:s,:v,:p,:name,:pin)
+        ON CONFLICT (exam_id,revision,student_id,version_id,page)
+        DO UPDATE SET name=excluded.name,pinned=excluded.pinned
+        RETURNING version_id,page,name,pinned""",
+        e=eid,
+        n=n,
+        s=uid,
+        v=vid,
+        p=page,
+        name=data.name,
+        pin=data.pinned,
+    )
+
+
+@router.delete(EXAM + "/marks/{vid}/{page}")
+def delete_mark(eid: int, vid: int, page: int, db: DB, uid: Student):
+    one(db, "SELECT id FROM exam WHERE id=:e FOR UPDATE", e=eid)
+    one(
+        db,
+        """SELECT id FROM exam_attempt WHERE exam_id=:e AND student_id=:s
+        FOR UPDATE""",
+        e=eid,
+        s=uid,
+    )
+    rows(
+        db,
+        """DELETE FROM exam_page_mark WHERE exam_id=:e AND revision=:n
+        AND student_id=:s AND version_id=:v AND page=:p""",
+        e=eid,
+        n=permitted(db, eid, uid),
+        s=uid,
+        v=vid,
+        p=page,
+    )
+    return {"removed": True}
