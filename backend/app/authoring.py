@@ -19,6 +19,7 @@ class Question(BaseModel):
     stem: Content
     options: list[Content] = Field(min_length=2, max_length=20)
     correct: int = Field(ge=0)
+    explanation: str = Field(default="", max_length=4000)
     topics: list[Name] = Field(min_length=1, max_length=30)
     objectives: list[Name] = Field(default_factory=list, max_length=30)
 

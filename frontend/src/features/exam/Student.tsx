@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { navigate, useRoute } from '../../app/route'
 import { api, useAction, useResource } from '../../app/api'
 
+import { StudentResult } from '../results/Results'
 import { AttemptWorkspace } from './Workspace'
 import { Resources } from '../references/Resources'
 
@@ -73,26 +74,30 @@ function ExamDetails({ id, back }: { id: number; back: () => void }) {
       ) : (
         <>
           <h2>{data.title}</h2>
-          <details open={!(attempt || savedAttempt.data)} className="exam-brief">
+          <StudentResult eid={id} />
+          <details
+            open={!(attempt || savedAttempt.data)}
+            className="exam-brief"
+          >
             <summary>Exam instructions and rules</summary>
-          <p>
-            {data.availability} · {data.duration} minutes
-          </p>
-          <p>
-            {new Date(data.opens_at).toLocaleString()} –{' '}
-            {new Date(data.closes_at).toLocaleString()}
-          </p>
-          <h3>Instructions</h3>
-          <p>{data.instructions}</p>
-          <h3>Permitted resources</h3>
-          <p>{data.rules}</p>
-          <p>Calculator {data.calculator ? 'permitted' : 'disabled'}</p>
-          {data.pre_release !== undefined && (
             <p>
-              {data.pre_release ? 'Released before opening. ' : ''}During the
-              exam, references require an active attempt.
+              {data.availability} · {data.duration} minutes
             </p>
-          )}
+            <p>
+              {new Date(data.opens_at).toLocaleString()} –{' '}
+              {new Date(data.closes_at).toLocaleString()}
+            </p>
+            <h3>Instructions</h3>
+            <p>{data.instructions}</p>
+            <h3>Permitted resources</h3>
+            <p>{data.rules}</p>
+            <p>Calculator {data.calculator ? 'permitted' : 'disabled'}</p>
+            {data.pre_release !== undefined && (
+              <p>
+                {data.pre_release ? 'Released before opening. ' : ''}During the
+                exam, references require an active attempt.
+              </p>
+            )}
           </details>
           {data.pre_release && data.availability === 'upcoming' && (
             <Resources path={path + '/references'} />

@@ -137,6 +137,24 @@ Use **DBMS Rehearsal — Calculator disabled** for the two-minute expiry case. S
 
 Deployments need same-origin API routing and an SPA fallback that serves `index.html` for frontend routes such as `/courses/123` and `/exams/123`. Keep `/api` and asset paths outside that fallback. Connection diagnostics are available on the sign-in page.
 
+## Exercise Phase 5 results on Windows
+
+Use the same development database and accounts as Phases 3 and 4. From the repository root, apply the migration and seed the results cases.
+
+```powershell
+Push-Location backend
+..\.venv\Scripts\python.exe -m alembic upgrade head
+Pop-Location
+.\scripts\Initialize-Demo.ps1 -Development
+Push-Location backend
+..\.venv\Scripts\python.exe -m app.results_demo --development
+Pop-Location
+```
+
+Start the API, frontend and expiry worker using the existing commands. Sign in as `demo_lecturer`, open the DBMS course and select **DBMS Results — Awaiting release**. Open **View exam results**. Expect five graded attempts, one student who never started, an average of 2.2/5, and scores of 0, 1, 2, 3 and 5. Review an attempt before confirming release. Sign in as `demo_student_01` and open **My results** to see 5/5 and the five explanations. Student 06 sees no attempt. **DBMS Results — Released** is published by the seed for an immediate walkthrough.
+
+Release is irreversible through the application and requires exam close plus complete grading of all started attempts. A pending expired attempt is processed by the expiry worker. Re-running the seed reuses both exams and preserves prior work.
+
 ## Checks
 
 Run these from the repository root after installing dependencies.

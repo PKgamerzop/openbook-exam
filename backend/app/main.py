@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import access, attempts, authoring, courses, references, workspace
 from app.db import check_database
+from app.results import router as results_router
 
 app = FastAPI(title="OpenBook API")
 for feature in (access, courses, authoring, attempts, references, workspace):
@@ -39,3 +40,6 @@ def health() -> JSONResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     return JSONResponse({"status": "ok", "database": "available"})
+
+
+app.include_router(results_router)

@@ -2,6 +2,7 @@ export type Question = {
   stem: string
   options: string[]
   correct: number
+  explanation?: string
   topics: string[]
   objectives: string[]
 }

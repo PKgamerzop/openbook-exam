@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { navigate } from '../../app/route'
 import { api, useAction, useResource } from '../../app/api'
 import {
   localTime,
@@ -97,6 +98,16 @@ export function Editor({
         Back to course
       </button>
       <h2>{draft.title}</h2>
+      {exam.published_number && (
+        <button
+          onClick={() => {
+            if (!dirty || window.confirm('Discard unsaved edits?'))
+              navigate(window.location.pathname + '/results')
+          }}
+        >
+          View exam results
+        </button>
+      )}
       <p>
         {exam.published_number
           ? 'Published revision ' + exam.published_number
@@ -238,6 +249,14 @@ export function Editor({
               <textarea
                 value={q.stem}
                 onChange={(e) => question(i, { stem: e.target.value })}
+              />
+            </label>
+            <label>
+              Feedback explanation
+              <textarea
+                value={q.explanation ?? ''}
+                maxLength={4000}
+                onChange={(e) => question(i, { explanation: e.target.value })}
               />
             </label>
             {q.options.map((option, j) => (

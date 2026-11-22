@@ -151,3 +151,16 @@ nav [aria-pressed="false"] { color: var(--accent); background: #eaf2ed; }
   .workspace-tabs { display: flex; gap: .5rem; margin: .5rem 0; }
   .workspace-with-references > div:not(.panel-active) { display: none; }
 }
+.result-summary { display: grid; grid-template-columns: repeat(auto-fit,minmax(8rem,1fr)); gap: .6rem; }
+.result-summary div, .feedback-list li { border: 1px solid var(--border); border-radius: .5rem; padding: .75rem; }
+.result-summary dt { text-transform: capitalize; }
+.result-summary dd { margin: 0; font-weight: 700; }
+.result-table { width: 100%; overflow: auto; margin: 1rem 0; }
+.result-table table { border-collapse: collapse; width: 100%; }
+.result-table caption { text-align: left; font-weight: 700; }
+.result-table th, .result-table td { text-align: left; padding: .45rem .65rem; border-bottom: 1px solid var(--border); }
+.score-distribution { padding: 0; list-style: none; }
+.score-distribution li { display: grid; grid-template-columns: 6rem 1fr 7rem; align-items: center; gap: .5rem; }
+.score-distribution meter { width: 100%; }
+.feedback-list li { margin-bottom: .5rem; }
+.results-dashboard dialog { max-width: min(34rem,90vw); border: 1px solid var(--border); border-radius: .75rem; }
