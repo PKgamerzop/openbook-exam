@@ -2,10 +2,10 @@ import json
 import os
 from datetime import timedelta
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import expect, sync_playwright
-from test_browser import screenshot
 from test_browser import website as website
 from test_references import dataset as dataset
 from test_references import login
@@ -130,7 +130,12 @@ def test_mock_browser(dataset, website, monkeypatch):
         expect(page.get_by_text("Engineering trade-off", exact=True)).to_be_visible()
         button("Review question").click()
         expect(button("Apply proposed stem")).to_be_enabled()
-        screenshot(page, "01-mock-authoring-review")
+        if directory := os.getenv("OPENBOOK_SCREENSHOTS"):
+            target = Path(directory)
+            target.mkdir(parents=True, exist_ok=True)
+            page.locator(".authoring-assistance").screenshot(
+                path=target / "01-mock-authoring-review.png"
+            )
         expect(button("Save draft")).to_be_disabled()
         stem = page.get_by_label("Question stem").first
         original = stem.input_value()

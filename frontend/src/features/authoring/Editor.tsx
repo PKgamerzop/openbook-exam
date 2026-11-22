@@ -111,6 +111,15 @@ export function Editor({
           <Preview draft={exam.published} />
         </details>
       )}
+      {!exam.frozen && (
+        <Assistance
+          eid={exam.id}
+          questions={draft.questions}
+          edit={exam.edit_number}
+          dirty={dirty || busy}
+          apply={(i, stem) => question(i, { stem })}
+        />
+      )}
       <fieldset disabled={busy || exam.frozen}>
         <legend>Exam settings</legend>
         <label>
@@ -367,15 +376,6 @@ export function Editor({
           Validate and publish
         </button>
       </fieldset>
-      {!exam.frozen && (
-        <Assistance
-          eid={exam.id}
-          questions={draft.questions}
-          edit={exam.edit_number}
-          dirty={dirty || busy}
-          apply={(i, stem) => question(i, { stem })}
-        />
-      )}
       <details>
         <summary>Preview draft</summary>
         <Preview draft={draft} />
