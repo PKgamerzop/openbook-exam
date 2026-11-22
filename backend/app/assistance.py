@@ -171,18 +171,46 @@ def openai(kind, content):
 
 def mock(kind, content):
     if kind == "scenario":
+        topic = content["topic"]
+        context = content["context"][:210] or "a maintenance team"
+        skill = content["skill"][:160] or "justify a choice using the given constraints"
+        objective = content["objective"][:160] or f"apply {topic}"
+        guidance = content["prompt"][:180]
+        observation = (
+            f"{context} must choose between two approaches to {topic}. "
+            "Give the team a typical workload and a tighter operating constraint."
+        )
+        suggestion = (
+            f"At {content['difficulty'].lower()} difficulty, ask students to {skill}. "
+            f"Use the objective: {objective}. "
+            "Ask whether their recommendation changes when the workload doubles."
+        )
+        if guidance:
+            suggestion += f" Author's guidance: {guidance}."
         return Batch(
             suggestions=[
                 Suggestion(
                     focus="Engineering trade-off",
-                    observation=f"Compare two designs for {content['topic']}.",
-                    suggestion="Give a workload and constraint. Ask students to "
-                    "choose the design and reason about its cost under that condition.",
+                    observation=observation,
+                    suggestion=suggestion,
                     assumption="Check course coverage for both designs.",
                     proposed_stem="",
                 )
             ]
         )
+    options = [" ".join(option.casefold().split()) for option in content["options"]]
+    duplicate = len(set(options)) < len(options)
+    stem = content["stem"]
+    fixture_stem = (
+        "A small table fits in memory and joins a stream on equality. "
+        "Which strategy fits?"
+    )
+    proposed = (
+        "A small table fits in memory and joins a stream on equality. "
+        "Which join strategy can build an in-memory lookup on the small table?"
+        if stem == fixture_stem
+        else ""
+    )
     return Batch(
         suggestions=[
             Suggestion(
@@ -191,11 +219,15 @@ def mock(kind, content):
                 suggestion="State workload and criteria. Check distractors "
                 "against the same assumptions before saving.",
                 assumption="Mock output does not verify facts or the answer key.",
-                proposed_stem="Using the assumptions given, " + content["stem"][:700],
+                proposed_stem=proposed,
             ),
             Suggestion(
                 focus="Distractor quality",
-                observation="Base distractors on typical misconceptions.",
+                observation=(
+                    "Two or more options have the same wording."
+                    if duplicate
+                    else "Base distractors on typical misconceptions."
+                ),
                 suggestion="Check that exactly one option fits the facts.",
                 assumption="Have a second lecturer check the answer independently.",
                 proposed_stem="",

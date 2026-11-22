@@ -154,7 +154,8 @@ export function Assistance({
               Review question
             </button>
           </fieldset>
-          {dirty && (
+          {!questions.length && <p>Add and save a question to enable review.</p>}
+          {dirty && questions.length > 0 && (
             <p>Save draft edits before requesting another question review.</p>
           )}
         </>

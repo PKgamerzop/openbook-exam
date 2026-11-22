@@ -126,7 +126,11 @@ def test_mock_browser(dataset, website, monkeypatch):
         button(TITLES[1]).click()
         page.get_by_text("Optional authoring assistance", exact=True).click()
         page.get_by_label("Topic", exact=True).fill("Join strategies")
+        page.get_by_label("Engineering context").fill("Campus repair desk")
         button("Suggest scenarios").click()
+        expect(
+            page.get_by_text("Campus repair desk must choose", exact=False)
+        ).to_be_visible()
         expect(page.get_by_text("Engineering trade-off", exact=True)).to_be_visible()
         button("Review question").click()
         expect(button("Apply proposed stem")).to_be_enabled()
@@ -138,9 +142,11 @@ def test_mock_browser(dataset, website, monkeypatch):
             )
         expect(button("Save draft")).to_be_disabled()
         stem = page.get_by_label("Question stem").first
-        original = stem.input_value()
         button("Apply proposed stem").click()
-        expect(stem).to_have_value("Using the assumptions given, " + original)
+        expect(stem).to_have_value(
+            "A small table fits in memory and joins a stream on equality. "
+            "Which join strategy can build an in-memory lookup on the small table?"
+        )
         expect(button("Save draft")).to_be_enabled()
         button("Save draft").click()
         expect(page.get_by_text("Draft saved", exact=True)).to_be_visible()
