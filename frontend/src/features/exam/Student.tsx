@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { api, useAction, useResource } from '../../app/api'
 
+import { Resources } from '../references/Resources'
+
 type Details = {
+  pre_release?: boolean
   id: number
   title: string
   availability: string
@@ -82,6 +85,8 @@ function ExamDetails({ id, back }: { id: number; back: () => void }) {
           <h3>Permitted resources</h3>
           <p>{data.rules}</p>
           <p>Calculator {data.calculator ? 'permitted' : 'disabled'}</p>
+          {data.pre_release !== undefined && <p>{data.pre_release ? 'Released before opening. ' : ''}During the exam, references require an active attempt.</p>}
+          {((data.pre_release && data.availability === 'upcoming') || (attempt && data.pre_release !== undefined)) && <Resources path={path+'/references'}/>}
           {attempt ? (
             <article>
               <p>

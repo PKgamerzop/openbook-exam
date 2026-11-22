@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, useResource, useAction } from '../../app/api'
+import { Library } from '../references/Resources'
 import { Editor } from './Editor'
 import type { Course, Exam, Roster } from './model'
 
@@ -51,6 +52,7 @@ export function Lecturer() {
 
 function CourseView({ cid, back }: { cid: number; back: () => void }) {
   const [refresh, reload] = useState(0)
+  const [library, showLibrary] = useState(false)
   const [exam, setExam] = useState<Exam>()
   const [username, setUsername] = useState('')
   const [title, setTitle] = useState('')
@@ -76,6 +78,8 @@ function CourseView({ cid, back }: { cid: number; back: () => void }) {
     <section>
       <button onClick={back}>All courses</button>
       <h2>{roster.data?.name || 'Loading course…'}</h2>
+      <nav aria-label="Course navigation"><button aria-pressed={!library} onClick={()=>showLibrary(false)}>Exams and enrollment</button><button aria-pressed={library} onClick={()=>showLibrary(true)}>Reference Library</button></nav>
+      {library ? <Library cid={cid}/> : <>
       <h3>Enrollment</h3>
       <p>
         {roster.data?.students.map((s) => s.username).join(', ') ||
@@ -138,6 +142,7 @@ function CourseView({ cid, back }: { cid: number; back: () => void }) {
         </label>
         <button disabled={busy}>Create draft</button>
       </form>
+      </>}
       {(error || roster.error || exams.error) && (
         <p role="alert">{error || roster.error || exams.error}</p>
       )}

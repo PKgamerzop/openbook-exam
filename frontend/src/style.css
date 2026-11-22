@@ -56,6 +56,14 @@ input:not([type=checkbox]):not([type=radio]), textarea {
 }
 textarea { min-height: 4rem; }
 button { margin: .25rem .35rem .25rem 0; }
+.library-entry { border-top: 1px solid #ccdace; padding: 1rem 0; }
+.library-entry h4 { margin: 0; }
+.processing-status { display: inline-block; border-radius: .3rem; background: #eaf2ed; padding: .1rem .5rem; }
+.pdf-view canvas { display: block; max-width: 100%; height: auto; border: 1px solid #ccdace; }
+.pdf-view canvas[hidden] { display: none; }
+nav[aria-label="Course navigation"] { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0; }
+nav [aria-pressed="false"] { color: #175943; background: #eaf2ed; }
+select { max-width: 100%; padding: .5rem; font: inherit; }
 legend, summary { font-weight: 600; }
 summary { cursor: pointer; }
 [role=alert] { color: #902716; }
