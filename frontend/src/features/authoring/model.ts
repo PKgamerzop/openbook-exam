@@ -11,6 +11,7 @@ export type Draft = {
   rules: string
   reference_versions?: number[]
   pre_release?: boolean
+  allow_reference_export?: boolean
   calculator: boolean
   opens_at: string | null
   closes_at: string | null

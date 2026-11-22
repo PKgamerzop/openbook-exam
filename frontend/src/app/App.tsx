@@ -10,7 +10,11 @@ const statusText: Record<ConnectionStatus, string> = {
 }
 
 export function App() {
-  return <main className="app-shell"><Portal /></main>
+  return (
+    <main className="app-shell">
+      <Portal />
+    </main>
+  )
 }
 
 export function Diagnostics() {
@@ -19,10 +23,11 @@ export function Diagnostics() {
 
   useEffect(() => {
     const controller = new AbortController()
-    void checkBackend(AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]))
-      .then((result) => {
-        if (!controller.signal.aborted) setStatus(result)
-      })
+    void checkBackend(
+      AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
+    ).then((result) => {
+      if (!controller.signal.aborted) setStatus(result)
+    })
     return () => controller.abort()
   }, [attempt])
 
@@ -31,7 +36,9 @@ export function Diagnostics() {
       <summary>Connection diagnostics</summary>
       <section aria-labelledby="connection">
         <h2 id="connection">Backend connection</h2>
-        <p role="status" data-state={status}>{statusText[status]}</p>
+        <p role="status" data-state={status}>
+          {statusText[status]}
+        </p>
         <button
           disabled={status === 'checking'}
           onClick={() => {

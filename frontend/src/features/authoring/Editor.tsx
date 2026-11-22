@@ -147,6 +147,16 @@ export function Editor({
             />{' '}
             Release references to assigned students before opening
           </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.allow_reference_export ?? false}
+              onChange={(e) =>
+                change({ allow_reference_export: e.target.checked })
+              }
+            />{' '}
+            Show PDF print and download controls
+          </label>
           <p>During the examination, students need an active attempt.</p>
         </fieldset>
         <label>

@@ -17,6 +17,8 @@ export type Reference = {
 export const libraryPath = (cid: number) =>
   '/lecturer/courses/' + cid + '/references'
 
+type Mark = { version_id: number; page: number; name: string; pinned: boolean }
+
 export function Resources({ path }: { path: string }) {
   const { data, error } = useResource<Reference[]>(path)
   const [query, setQuery] = useState('')
@@ -27,8 +29,19 @@ export function Resources({ path }: { path: string }) {
     sequence: number
   }>()
   const [offset, paginate] = useState(0)
+  const [activePage, setActivePage] = useState(1)
+  const [markRefresh, reloadMarks] = useState(0)
+  const exportPolicy = useResource<{ allowed: boolean }>(
+    data?.length ? path + '/export-policy' : '',
+  )
+  const marks = useResource<Mark[]>(
+    data?.length ? path + '/marks' : '',
+    markRefresh,
+  )
+  const { run: markAction, busy: markBusy, error: markError } = useAction()
   const selectedDoc = data?.find((d) => d.id === selected?.id)
   function jump(id: number, page: number) {
+    setActivePage(page)
     open((s) => ({ id, page, sequence: (s?.sequence ?? 0) + 1 }))
   }
   if (error) return <p role="alert">{error}</p>
@@ -76,11 +89,99 @@ export function Resources({ path }: { path: string }) {
           paginate={paginate}
         />
       )}
+      <details>
+        <summary>Bookmarks and pinned pages</summary>
+        {!marks.data?.length && <p>No saved pages.</p>}
+        {data.map((d) => {
+          const saved = marks.data?.filter((m) => m.version_id === d.id) ?? []
+          if (!saved.length) return null
+          return (
+            <div key={d.id}>
+              <h4>{d.title}</h4>
+              <ul>
+                {saved.map((m) => (
+                  <li key={m.page}>
+                    <button onClick={() => jump(d.id, m.page)}>
+                      {m.name || 'Page ' + m.page}
+                      {m.pinned ? ' · pinned' : ''}
+                    </button>
+                    <button
+                      disabled={markBusy}
+                      onClick={() =>
+                        void markAction(async () => {
+                          await api(
+                            path + '/marks/' + d.id + '/' + m.page,
+                            'PUT',
+                            { name: m.name, pinned: !m.pinned },
+                          )
+                          reloadMarks((n) => n + 1)
+                        })
+                      }
+                    >
+                      {m.pinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    <button
+                      disabled={markBusy}
+                      onClick={() =>
+                        void markAction(async () => {
+                          await api(
+                            path + '/marks/' + d.id + '/' + m.page,
+                            'DELETE',
+                          )
+                          reloadMarks((n) => n + 1)
+                        })
+                      }
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
+      </details>
+      {(marks.error || markError) && (
+        <p role="alert">{marks.error || markError}</p>
+      )}
+      {selectedDoc && (
+        <form
+          className="reference-toolbar"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const form = e.currentTarget
+            const fields = new FormData(form)
+            void markAction(async () => {
+              await api(
+                path + '/marks/' + selectedDoc.id + '/' + activePage,
+                'PUT',
+                {
+                  name: String(fields.get('name') ?? ''),
+                  pinned: fields.has('pin'),
+                },
+              )
+              form.reset()
+              reloadMarks((n) => n + 1)
+            })
+          }}
+        >
+          <label>
+            Bookmark name
+            <input name="name" maxLength={100} />
+          </label>
+          <label>
+            <input type="checkbox" name="pin" /> Pin page
+          </label>
+          <button disabled={markBusy}>Bookmark page {activePage}</button>
+        </form>
+      )}
       {selected && selectedDoc && (
         <Viewer
           key={selected.sequence}
           title={selectedDoc.title}
           initialPage={selected.page}
+          onPage={setActivePage}
+          allowExport={exportPolicy.data?.allowed === true}
           url={'/api' + path + '/' + selected.id + '/file'}
         />
       )}
