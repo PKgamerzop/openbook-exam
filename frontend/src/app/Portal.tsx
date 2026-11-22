@@ -3,11 +3,13 @@ import { Lecturer } from '../features/authoring/Lecturer'
 import { Student } from '../features/exam/Student'
 import { Diagnostics } from './App'
 import { navigate } from './route'
-import { api, useAction } from './api'
+import { ApiError, api, useAction } from './api'
 
 type User = { id: number; role: 'lecturer' | 'student'; username: string }
 export function Portal() {
   const [user, setUser] = useState<User | null>()
+  const [sessionUnavailable, setSessionUnavailable] = useState(false)
+  const [sessionCheck, setSessionCheck] = useState(0)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const { run, busy, error } = useAction()
@@ -17,12 +19,31 @@ export function Portal() {
     window.addEventListener('openbook-session-expired', expire)
     api<User>('/me')
       .then((u) => live && setUser(u))
-      .catch(() => live && setUser(null))
+      .catch((failure: unknown) => {
+        if (!live) return
+        if (failure instanceof ApiError && failure.status === 401) setUser(null)
+        else setSessionUnavailable(true)
+      })
     return () => {
       live = false
       window.removeEventListener('openbook-session-expired', expire)
     }
-  }, [])
+  }, [sessionCheck])
+  if (sessionUnavailable)
+    return (
+      <section className="sign-in">
+        <h1>OpenBook</h1>
+        <p role="alert">The examination service is temporarily unavailable.</p>
+        <button
+          onClick={() => {
+            setSessionUnavailable(false)
+            setSessionCheck((previous) => previous + 1)
+          }}
+        >
+          Retry connection
+        </button>
+      </section>
+    )
   if (user === undefined) return <p role="status">Checking session…</p>
   return (
     <>

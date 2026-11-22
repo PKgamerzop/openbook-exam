@@ -109,6 +109,7 @@ export function Viewer({
   const [page, setPage] = useState(initialPage)
   const [scale, setScale] = useState(100)
   const [error, setError] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState('')
   const [outline, setOutline] = useState<Outline>([])
@@ -194,7 +195,7 @@ export function Viewer({
       instance.current = null
       void loading.destroy()
     }
-  }, [url, initialPage])
+  }, [url, initialPage, loadAttempt])
 
   useEffect(() => {
     onPage?.(page)
@@ -249,7 +250,20 @@ export function Viewer({
           </a>
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <div>
+          <p role="alert">{error}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setError('')
+              setLoadAttempt((attempt) => attempt + 1)
+            }}
+          >
+            Retry PDF
+          </button>
+        </div>
+      )}
       {!doc && !error && <p role="status">Loading PDF…</p>}
       <fieldset className="reader-toolbar" disabled={!doc}>
         <legend>PDF navigation</legend>

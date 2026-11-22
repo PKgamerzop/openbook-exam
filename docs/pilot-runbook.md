@@ -5,7 +5,8 @@
 Follow [deployment](deployment.md) first. Generate a synthetic password in a local secret manager, then enter it through stdin. This fixture requires loopback HTTPS staging and an isolated database with no existing accounts. Repeat seeding keeps the same IDs and does not reset existing attempts or schedules.
 
 ~~~powershell
-$pilotSecret = Read-Host 'Synthetic pilot password'
+$securePilotSecret = Read-Host 'Synthetic pilot password' -AsSecureString
+$pilotSecret = [System.Net.NetworkCredential]::new('', $securePilotSecret).Password
 $pilotSecret | docker compose -p openbook-p6-stage --env-file .env.staging -f compose.production.yaml exec -T api python -m app.pilot --synthetic-staging |
   Set-Content -Encoding ascii .phase6-local/pilot.json
 $pilotSecret | python scripts/phase6_load.py --ca .phase6-local/stage-root.crt --manifest .phase6-local/pilot.json --concurrency 30 --rounds 5 --password-stdin --output .phase6-local/load30.json
@@ -24,6 +25,8 @@ Use a separate learner session. Confirm an acknowledged edit, simulate offline m
 
 ## Institutional decisions
 
+Start with a supervised cohort of at most 30 learners after an on-host rehearsal. Have a designated operator provision local accounts and ask learners to sign in shortly before the exam. Confirm identity policy and a maximum supported exam duration before enrolling a real cohort.
+
 | Decision | State |
 | --- | --- |
 | Hosting owner and location | Blocked pending approval and infrastructure selection |
@@ -34,3 +37,10 @@ Use a separate learner session. Confirm an acknowledged edit, simulate offline m
 | Availability, recovery point and recovery time targets | Pending institutional policy |
 | Remote vs supervised exams and support coverage | Pending institutional policy |
 | Human usability approval | Pending review with lecturers and students |
+
+
+## Rehearsal evidence
+
+The automated supervised Chrome flow authored, scheduled and published an exam, signed in as a learner, saved and submitted a response, and checked the lecturer-visible grade. Separate Chrome coverage verified release and mobile private feedback. Local staging used fictional accounts and a 120-page permitted reference. A human-supervised cohort and an off-site network still require institutional approval and infrastructure.
+
+The remote Chrome rehearsal simulated a dropped answer-save request and stopped the staging API. A reload while it was down showed a service outage. After the API started, **Retry connection** recovered the same session, acknowledged answer, question flag and remaining timer. The learner then submitted successfully.

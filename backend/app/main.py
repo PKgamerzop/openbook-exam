@@ -58,8 +58,10 @@ async def protect_requests(request: Request, call_next):
             response = JSONResponse({"detail": "Service request failed"}, 500)
     elapsed = int((monotonic() - started) * 1000)
     if is_deployed and (response.status_code >= 500 or elapsed >= 1000):
+        route = getattr(request.scope.get("route"), "path", "unmatched")
         operations.warning(
-            '{"event":"request_outcome","status":%d,"duration_ms":%d}',
+            '{"event":"request_outcome","route":"%s","status":%d,"duration_ms":%d}',
+            route,
             response.status_code,
             elapsed,
         )

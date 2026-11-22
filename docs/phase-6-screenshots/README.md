@@ -7,3 +7,5 @@ Google Chrome captured these screens with fictional accounts and exam data. The 
 - [MCQ editor](09-mcq-editor.png) and [submission review](10-submission-review.png)
 - [Lecturer results](01-lecturer-results.png), [release confirmation](02-release-confirmation.png), and [mobile student feedback](03-student-feedback-mobile.png)
 - [Staging desktop workspace](09-staging-workspace-desktop.png), [tablet workspace](10-staging-workspace-tablet.png), and [tablet 120-page PDF reader](11-staging-reader-tablet.png)
+
+- [Mobile failed save](12-staging-failed-save-mobile.png) and [mobile after reconnecting to the restarted API](13-staging-recovered-mobile.png)

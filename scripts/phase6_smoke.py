@@ -9,6 +9,7 @@ from getpass import getpass
 from http.cookiejar import CookieJar
 from pathlib import Path
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 from urllib.request import HTTPCookieProcessor, HTTPSHandler, Request, build_opener
 
 
@@ -19,6 +20,9 @@ def main():
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--password-stdin", action="store_true")
     args = parser.parse_args()
+    origin = urlsplit(args.origin)
+    if origin.scheme != "https" or origin.hostname != "localhost":
+        parser.error("Use the loopback HTTPS stage or isolated restore origin.")
     password = input() if args.password_stdin else getpass("Synthetic pilot password: ")
     data = json.loads(args.manifest.read_text(encoding="utf-8-sig"))
     context = ssl.create_default_context(cafile=str(args.ca))
@@ -105,9 +109,20 @@ def main():
         assert sorted(graded) == [0, 1, 1, 1, 1]
     eid = data["exams"]["unreleased"]
     payload, _ = send(f"/api/student/exams/{eid}/result", client=student)
-    assert "score" not in json.loads(payload)
+    assert json.loads(payload) == {"status": "expired", "released": False}
     send("/api/logout", client=student, method="POST")
     send("/api/me", client=student, status=401)
+    send(
+        "/api/login",
+        client=student,
+        method="POST",
+        body={"username": "pilot_student_01", "password": password},
+    )
+    eid = data["exams"]["released"]
+    payload, _ = send(f"/api/student/exams/{eid}/result", client=student)
+    released = json.loads(payload)
+    assert released["released"] and released["feedback"]["score"] == 0
+    assert released["feedback"]["maximum"] == 10
     print(
         "HTTPS, secure session, SPA, PDF ranges, AI-disabled and grading checks passed"
     )
