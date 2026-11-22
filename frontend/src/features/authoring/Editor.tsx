@@ -11,6 +11,8 @@ import {
 
 import { libraryPath, type Reference } from '../references/Resources'
 
+import { Assistance } from './Assistance'
+
 function Preview({ draft }: { draft: Draft }) {
   return (
     <article>
@@ -365,6 +367,15 @@ export function Editor({
           Validate and publish
         </button>
       </fieldset>
+      {!exam.frozen && (
+        <Assistance
+          eid={exam.id}
+          questions={draft.questions}
+          edit={exam.edit_number}
+          dirty={dirty || busy}
+          apply={(i, stem) => question(i, { stem })}
+        />
+      )}
       <details>
         <summary>Preview draft</summary>
         <Preview draft={draft} />
