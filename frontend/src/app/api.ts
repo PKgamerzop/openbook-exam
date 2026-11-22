@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+  }
+}
+
 export async function api<T>(
   path: string,
   method = 'GET',
@@ -15,7 +21,10 @@ export async function api<T>(
       window.dispatchEvent(new Event('openbook-session-expired'))
     }
     const problem = await response.json().catch(() => ({}))
-    throw new Error(problem.detail || `Request failed (${response.status})`)
+    throw new ApiError(
+      problem.detail || `Request failed (${response.status})`,
+      response.status,
+    )
   }
   return response.json()
 }

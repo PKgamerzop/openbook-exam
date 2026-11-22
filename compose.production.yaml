@@ -1,0 +1,118 @@
+x-app: &app
+  image: openbook-app:phase6
+  build: ./backend
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: [/tmp:mode=1777]
+  environment:
+    OPENBOOK_ENV: ${OPENBOOK_ENV:?Set deployment mode}
+    OPENBOOK_ORIGIN: ${OPENBOOK_ORIGIN:?Set the HTTPS origin}
+    OPENBOOK_BIND: ${OPENBOOK_BIND:-127.0.0.1}
+    OPENBOOK_HTTPS_PORT: ${OPENBOOK_HTTPS_PORT:-8443}
+    OPENBOOK_TLS_DIRECTIVE: ${OPENBOOK_TLS_DIRECTIVE-}
+    OPENBOOK_LOCAL_HTTP: "0"
+    OPENBOOK_AI_PROVIDER: disabled
+    OPENBOOK_PDF_DIR: /private-pdfs
+    OPENBOOK_PDF_MAX_BYTES: "20971520"
+    OPENBOOK_PDF_MAX_PAGES: "200"
+    POSTGRES_HOST: db
+    POSTGRES_DB: ${POSTGRES_DB:?Set database name}
+    POSTGRES_USER: ${POSTGRES_USER:?Set database user}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set database password}
+  volumes:
+    - private_pdfs:/private-pdfs
+  networks: [database]
+
+services:
+  db:
+    image: postgres:17.12@sha256:223efeb196329b55b3b9a13db144956411dbc18e727e59f681c3e0aede6475cf
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set database name}
+      POSTGRES_USER: ${POSTGRES_USER:?Set database user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set database password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [database]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    networks: [database, application]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.operational", "api"]
+      interval: 10s
+      timeout: 4s
+      retries: 5
+    restart: unless-stopped
+    stop_grace_period: 35s
+
+  indexer:
+    <<: *app
+    command: ["python", "-m", "app.reference_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.operational", "worker"]
+      interval: 15s
+      timeout: 4s
+      retries: 5
+    restart: unless-stopped
+    stop_grace_period: 35s
+
+  expiry:
+    <<: *app
+    command: ["python", "-m", "app.attempt_expiry"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.operational", "worker"]
+      interval: 15s
+      timeout: 4s
+      retries: 5
+    restart: unless-stopped
+
+  gateway:
+    build: ./frontend
+    environment:
+      OPENBOOK_ORIGIN: ${OPENBOOK_ORIGIN:?Set the HTTPS origin}
+      OPENBOOK_TLS_DIRECTIVE: ${OPENBOOK_TLS_DIRECTIVE-}
+    networks: [application, edge]
+    ports:
+      - "${OPENBOOK_BIND:-127.0.0.1}:${OPENBOOK_HTTPS_PORT:-8443}:${OPENBOOK_HTTPS_PORT:-8443}"
+    volumes:
+      - gateway_data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  database:
+    internal: true
+  application:
+    internal: true
+  edge:
+
+volumes:
+  postgres_data:
+  private_pdfs:
+  gateway_data:

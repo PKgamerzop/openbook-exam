@@ -75,6 +75,8 @@ summary { cursor: pointer; }
 
 .reference-library, .reference-panel { margin-top: 1.25rem; }
 .reference-panel { padding-top: 1rem; border-top: 1px solid var(--border); }
+.reference-hits { max-height: min(18rem, 40vh); overflow-y: auto; margin-block: .5rem; padding: .35rem; }
+.reader { scroll-margin-top: 5rem; }
 .upload-grid, .library-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; }
 .upload-grid { padding: 1rem; background: #f4f7f4; border-radius: .5rem; }
 .upload-grid label, .reference-toolbar label { margin: 0; }

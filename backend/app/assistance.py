@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app import store
 from app.access import DB, Lecturer
+from app.settings import deployed
 from app.store import one
 
 router = APIRouter(prefix="/api/lecturer/exams/{eid}/assistance")
@@ -68,6 +69,8 @@ def draft(db, eid, uid):
 
 
 def provider():
+    if deployed():
+        return "disabled"
     mode = os.getenv("OPENBOOK_AI_PROVIDER", "disabled")
     if mode == "mock":
         return mode

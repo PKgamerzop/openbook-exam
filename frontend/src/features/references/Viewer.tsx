@@ -89,12 +89,14 @@ export function Viewer({
   initialPage = 1,
   onPage,
   allowExport = true,
+  focusOnOpen = false,
 }: {
   url: string
   title: string
   initialPage?: number
   onPage?: (page: number) => void
   allowExport?: boolean
+  focusOnOpen?: boolean
 }) {
   const root = useRef<HTMLElement>(null)
   const container = useRef<HTMLDivElement>(null)
@@ -107,11 +109,18 @@ export function Viewer({
   const [page, setPage] = useState(initialPage)
   const [scale, setScale] = useState(100)
   const [error, setError] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState('')
   const [outline, setOutline] = useState<Outline>([])
   const [sidebar, setSidebar] = useState('')
   const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    if (!focusOnOpen) return
+    root.current?.focus({ preventScroll: true })
+    root.current?.scrollIntoView({ block: 'nearest' })
+  }, [focusOnOpen])
 
   useEffect(() => {
     const element = container.current!
@@ -186,7 +195,7 @@ export function Viewer({
       instance.current = null
       void loading.destroy()
     }
-  }, [url, initialPage])
+  }, [url, initialPage, loadAttempt])
 
   useEffect(() => {
     onPage?.(page)
@@ -224,6 +233,8 @@ export function Viewer({
     <article
       className={expanded ? 'reader reader-expanded' : 'reader'}
       ref={root}
+      tabIndex={focusOnOpen ? -1 : undefined}
+      aria-label={title + ' PDF reader'}
       onKeyDown={(e) => {
         if (e.key === 'Escape') setExpanded(false)
       }}
@@ -239,7 +250,20 @@ export function Viewer({
           </a>
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <div>
+          <p role="alert">{error}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setError('')
+              setLoadAttempt((attempt) => attempt + 1)
+            }}
+          >
+            Retry PDF
+          </button>
+        </div>
+      )}
       {!doc && !error && <p role="status">Loading PDF…</p>}
       <fieldset className="reader-toolbar" disabled={!doc}>
         <legend>PDF navigation</legend>

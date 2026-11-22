@@ -1,4 +1,7 @@
 .env
+.env.staging
+.env.production
+.phase6-local/
 .venv/
 __pycache__/
 .pytest_cache/

@@ -5,11 +5,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import URL, Engine, create_engine, text
 
-load_dotenv(Path(__file__).resolve().parents[2] / ".env", interpolate=False)
+from app.settings import validate_deployment
+
+if os.getenv("OPENBOOK_ENV", "development") == "development":
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", interpolate=False)
 
 
 @lru_cache
 def get_engine() -> Engine:
+    validate_deployment()
     url = URL.create(
         "postgresql+psycopg",
         username=os.environ["POSTGRES_USER"],
@@ -22,6 +26,7 @@ def get_engine() -> Engine:
         url,
         connect_args={"connect_timeout": 2},
         pool_pre_ping=True,
+        pool_timeout=5,
         hide_parameters=True,
     )
 
