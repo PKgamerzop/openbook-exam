@@ -122,9 +122,32 @@ nav [aria-pressed="false"] { color: var(--accent); background: #eaf2ed; }
 .reader-find { margin-bottom: .65rem; }
 .reader-find label { flex: 1 1 12rem; }
 .reader-panels { display: flex; background: #edf1ef; flex: 1; min-height: 0; }
+.reader-panels:not(.sidebar-open) { flex-direction: column; }
+.reader-panels:not(.sidebar-open) .reader-sidebar { max-width: 100%; }
+.exam-brief { margin-bottom: .75rem; }
 .reader-sidebar { flex: 0 0 auto; max-width: 35%; max-height: 65vh; overflow: auto; padding: .35rem; }
 .reader-thumbnails { display: grid; gap: .25rem; }
 .reader-thumbnails canvas { display: block; margin: auto; max-width: 100%; }
 .reader-scroll { position: relative; flex: 1; min-width: 0; min-height: 55vh; }
 .pdf-scroll-container { position: absolute; inset: 0; overflow: auto; }
 .reader-expanded { position: fixed; z-index: 10; inset: 0; height: 100dvh; margin: 0; display: flex; flex-direction: column; overflow: auto; }
+.workspace-header { position: sticky; z-index: 2; top: 0; background: white; border-bottom: 1px solid var(--border); padding: .65rem 0; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; }
+.workspace-header strong { margin-right: auto; }
+.deadline-warning { color: #902716; font-weight: 700; }
+.workspace-grid { display: grid; gap: 1rem; }
+.workspace-grid > div { min-width: 0; }
+.workspace-with-references { grid-template-columns: minmax(16rem, 1fr) minmax(0, var(--reference-width)); }
+.workspace-tabs { display: none; }
+.workspace-resize { max-width: 18rem; }
+.workspace-resize input[type=range] { padding: 0; }
+.question-map { display: flex; flex-wrap: wrap; gap: .25rem; padding: .5rem 0; }
+.question-map button[data-answered="false"] { color: var(--accent); background: #eaf2ed; }
+.question-map button[aria-current="step"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.answer-option, .workspace-review, .workspace-receipt { padding: .65rem; border: 1px solid var(--border); border-radius: .5rem; }
+.answer-option:has(input:checked) { background: #e0f1e6; }
+@media (max-width: 58rem) {
+  .workspace-with-references { grid-template-columns: 1fr; }
+  .workspace-resize { display: none; }
+  .workspace-tabs { display: flex; gap: .5rem; margin: .5rem 0; }
+  .workspace-with-references > div:not(.panel-active) { display: none; }
+}

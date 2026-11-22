@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { navigate, useRoute } from '../../app/route'
 import { api, useAction, useResource } from '../../app/api'
 
+import { AttemptWorkspace } from './Workspace'
 import { Resources } from '../references/Resources'
 
 type Details = {
@@ -15,11 +16,6 @@ type Details = {
   calculator: boolean
   opens_at: string
   closes_at: string
-}
-type Attempt = {
-  id: number
-  deadline: string
-  questions: { stem: string; options: string[] }[]
 }
 
 export function Student() {
@@ -64,8 +60,8 @@ function ExamDetails({ id, back }: { id: number; back: () => void }) {
   const path = '/student/exams/' + id
   const [refresh, reload] = useState(0)
   const { data, error: loadError } = useResource<Details>(path, refresh)
-  const [attempt, setAttempt] = useState<Attempt>()
-  const [index, setIndex] = useState(0)
+  const [attempt, setAttempt] = useState(false)
+  const savedAttempt = useResource<{ id: number }>(path + '/attempt')
   const { run, busy, error } = useAction()
   return (
     <section>
@@ -77,6 +73,8 @@ function ExamDetails({ id, back }: { id: number; back: () => void }) {
       ) : (
         <>
           <h2>{data.title}</h2>
+          <details open={!(attempt || savedAttempt.data)} className="exam-brief">
+            <summary>Exam instructions and rules</summary>
           <p>
             {data.availability} · {data.duration} minutes
           </p>
@@ -95,43 +93,26 @@ function ExamDetails({ id, back }: { id: number; back: () => void }) {
               exam, references require an active attempt.
             </p>
           )}
-          {((data.pre_release && data.availability === 'upcoming') ||
-            (attempt && data.pre_release !== undefined)) && (
+          </details>
+          {data.pre_release && data.availability === 'upcoming' && (
             <Resources path={path + '/references'} />
           )}
-          {attempt ? (
-            <article>
-              <p>
-                Attempt {attempt.id} · Deadline{' '}
-                {new Date(attempt.deadline).toLocaleString()}
-              </p>
-              <h3>
-                Question {index + 1} of {attempt.questions.length}
-              </h3>
-              <p>{attempt.questions[index].stem}</p>
-              <ol>
-                {attempt.questions[index].options.map((o, i) => (
-                  <li key={i}>{o}</li>
-                ))}
-              </ol>
-              <button disabled={!index} onClick={() => setIndex((i) => i - 1)}>
-                Previous
-              </button>
-              <button
-                disabled={index + 1 === attempt.questions.length}
-                onClick={() => setIndex((i) => i + 1)}
-              >
-                Next
-              </button>
-            </article>
+          {attempt || savedAttempt.data ? (
+            <AttemptWorkspace
+              path={path}
+              title={data.title}
+              references={data.pre_release !== undefined}
+              calculator={data.calculator}
+            />
           ) : (
             <>
               <button
                 disabled={busy || data.availability !== 'open'}
                 onClick={() =>
-                  void run(async () =>
-                    setAttempt(await api<Attempt>(path + '/start', 'POST')),
-                  )
+                  void run(async () => {
+                    await api(path + '/start', 'POST')
+                    setAttempt(true)
+                  })
                 }
               >
                 Start or resume attempt
