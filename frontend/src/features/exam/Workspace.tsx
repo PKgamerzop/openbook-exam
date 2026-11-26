@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, useAction, useResource } from '../../app/api'
+import { Icon } from '../../app/Icon'
+import { Sketchpad } from './Sketchpad'
 import { Calculator } from './Calculator'
 import { Resources } from '../references/Resources'
 
@@ -22,11 +24,17 @@ export function AttemptWorkspace({
   title,
   references,
   calculator,
+  rules,
+  result,
+  back,
 }: {
   path: string
   title: string
   references: boolean
   calculator: boolean
+  rules: ReactNode
+  result: ReactNode
+  back: () => void
 }) {
   const [generation, reload] = useState(0)
   const attempt = useResource<Attempt>(path + '/attempt', generation)
@@ -40,6 +48,9 @@ export function AttemptWorkspace({
       title={title}
       references={references}
       calculator={calculator}
+      rules={rules}
+      result={result}
+      back={back}
       reload={() => reload((n) => n + 1)}
     />
   )
@@ -51,6 +62,9 @@ function Workspace({
   title,
   references,
   calculator,
+  rules,
+  result,
+  back,
   reload,
 }: {
   initial: Attempt
@@ -58,17 +72,24 @@ function Workspace({
   title: string
   references: boolean
   calculator: boolean
+  rules: ReactNode
+  result: ReactNode
+  back: () => void
   reload: () => void
 }) {
   const endpoint = path + '/attempt'
   const [responses, setResponses] = useState(initial.responses)
   const [scratchpad, setScratchpad] = useState(initial.scratchpad)
   const [index, setIndex] = useState(0)
-  const [panel, setPanel] = useState('questions')
-  const [referenceWidth, resize] = useState(58)
+  const [panel, setPanel] = useState<'questions' | 'tools'>('questions')
+  const [tool, setTool] = useState(references ? 'references' : 'notes')
+  const [wideReference, setWideReference] = useState(false)
+  const [filter, setFilter] = useState('all')
+  const [scratchTool, setScratchTool] = useState<'text' | 'draw'>('text')
+  const reviewDialog = useRef<HTMLDialogElement>(null)
+  const questionPane = useRef<HTMLElement>(null)
   const [status, setStatus] = useState('Saved')
   const [receipt, setReceipt] = useState(initial.final_reason ? initial : null)
-  const [review, setReview] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const { run, error } = useAction()
   const revision = useRef(initial.revision)
@@ -151,6 +172,11 @@ function Workspace({
   }
 
   const question = initial.questions[index]
+  const total = initial.questions.length
+  function selectQuestion(next: number) {
+    setIndex(next)
+    questionPane.current?.scrollTo({ top: 0 })
+  }
   const response = responses[index] ?? { answer: null, flagged: false }
   const disabled = !remaining || submitting
   const answered = Object.values(responses).filter(
@@ -165,7 +191,10 @@ function Workspace({
 
   if (receipt)
     return (
-      <article className="workspace-receipt">
+      <section className="workspace-receipt">
+        <button className="button-quiet" onClick={back}><Icon name="left" />Assigned exams</button>
+        <div className="receipt-icon"><Icon name={receipt.final_reason === 'expired' ? 'clock' : 'check'} /></div>
+        <h2>{title}</h2>
         <h3>
           {receipt.final_reason === 'expired'
             ? 'Time expired'
@@ -182,214 +211,208 @@ function Workspace({
           }{' '}
           answers recorded.
         </p>
-      </article>
+        {result}
+      </section>
     )
 
   return (
-    <div className="exam-workspace">
+    <div className="exam-workspace" data-panel={panel}>
       <header className="workspace-header">
-        <strong>{title}</strong>
-        <span
-          className={remaining <= 300 ? 'deadline-warning' : ''}
-          role="timer"
-        >
-          {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}{' '}
-          remaining
-        </span>
-        <span role="status">{status}</span>
+        <div className="workspace-title">
+          <span className="workspace-label">Examination</span>
+          <h1>{title}</h1>
+        </div>
+        <div className="workspace-meta">
+          {rules}
+          <span className="save-status" role="status" data-status={status === 'Saved' ? 'saved' : status.startsWith('Save failed') ? 'failed' : 'pending'}>
+            <Icon name={status === 'Saved' ? 'check' : 'refresh'} />{status}
+          </span>
+          <span className="exam-timer" data-warning={remaining <= 300} role="timer">
+            <Icon name="clock" />
+            <span>{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')} <small>remaining</small></span>
+          </span>
+        </div>
       </header>
       {status.startsWith('Save failed') && (
-        <div>
-          <button onClick={() => void flush()} disabled={disabled}>
-            Retry saves
-          </button>
-          <button
-            onClick={() => {
-              if (
-                window.confirm(
-                  'Discard current unsaved edits and reload server-saved work?',
-                )
-              )
-                reload()
-            }}
-          >
-            Reload saved work
-          </button>
+        <div className="save-recovery">
+          <button onClick={() => void flush()} disabled={disabled}>Retry saves</button>
+          <button className="button-secondary" onClick={() => {
+            if (window.confirm('Discard current unsaved edits and reload server-saved work?')) reload()
+          }}>Reload saved work</button>
         </div>
       )}
-      <nav className="workspace-tabs" aria-label="Workspace panels">
-        <button
-          aria-pressed={panel === 'questions'}
-          onClick={() => setPanel('questions')}
-        >
-          Questions
+      <nav className="workspace-mobile-tabs" aria-label="Workspace panels">
+        <button aria-pressed={panel === 'questions'} onClick={() => setPanel('questions')}>
+          <Icon name="grid" /> Questions
         </button>
-        {references && (
-          <button
-            aria-pressed={panel === 'references'}
-            onClick={() => setPanel('references')}
-          >
-            References
-          </button>
-        )}
+        <button aria-pressed={panel === 'tools'} onClick={() => setPanel('tools')}>
+          <Icon name={references ? 'book' : 'edit'} /> Exam tools
+        </button>
       </nav>
-      {references && (
-        <label className="workspace-resize">
-          Reference panel width{' '}
-          <input
-            type="range"
-            min={42}
-            max={66}
-            value={referenceWidth}
-            onChange={(e) => resize(Number(e.target.value))}
-          />
-        </label>
-      )}
-      <div
-        className={
-          references
-            ? 'workspace-grid workspace-with-references'
-            : 'workspace-grid'
-        }
-        style={{ '--reference-width': referenceWidth + '%' } as CSSProperties}
-      >
-        <div
-          className={
-            'question-panel ' + (panel === 'questions' ? 'panel-active' : '')
-          }
-        >
+      <div className="workspace-grid" data-wide-reference={wideReference && tool === 'references'}>
+        <aside className="question-sidebar" aria-label="Question navigator">
           <details open>
-            <summary>Question navigator</summary>
-            <div className="question-map">
-              {initial.questions.map((_, i) => {
-                const saved = responses[i]
-                const answered = saved?.answer != null
-                return (
-                  <button
-                    key={i}
-                    aria-current={i === index ? 'step' : undefined}
-                    data-answered={answered}
-                    aria-label={`Question ${i + 1}, ${answered ? 'answered' : 'unanswered'}${saved?.flagged ? ', flagged' : ''}`}
-                    onClick={() => setIndex(i)}
-                  >
-                    {i + 1}
-                    {saved?.flagged ? ' ⚑' : ''}
-                  </button>
-                )
-              })}
+            <summary><Icon name="grid" /> Question navigator</summary>
+            <div className="navigator-content">
+              <label className="question-filter">
+                <span className="sr-only">Filter questions</span>
+                <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+                  <option value="all">All questions</option>
+                  <option value="unanswered">Unanswered</option>
+                  <option value="flagged">Flagged</option>
+                </select>
+              </label>
+              <div className="question-map">
+                {initial.questions.map((_, i) => {
+                  const saved = responses[i]
+                  const isAnswered = saved?.answer != null
+                  if ((filter === 'unanswered' && isAnswered) || (filter === 'flagged' && !saved?.flagged)) return null
+                  return (
+                    <button key={i} aria-current={i === index ? 'step' : undefined}
+                      data-answered={isAnswered}
+                      aria-label={`Question ${i + 1}, ${isAnswered ? 'answered' : 'unanswered'}${saved?.flagged ? ', flagged' : ''}`}
+                      onClick={() => selectQuestion(i)}>
+                      {i + 1}
+                      {saved?.flagged && <Icon name="flag" className="map-flag" />}
+                    </button>
+                  )
+                })}
+              </div>
+              {((filter === 'unanswered' && answered === total) || (filter === 'flagged' && !flagged))
+                && <p className="muted">No {filter} questions.</p>}
+              <div className="map-legend">
+                <span><i className="answered-key" /> Answered</span>
+                <span><i /> Unanswered</span>
+                <span><Icon name="flag" /> Flagged</span>
+              </div>
             </div>
           </details>
-          <fieldset disabled={disabled}>
-            <legend>
-              Question {index + 1} of {initial.questions.length}
-            </legend>
-            <p>{question.stem}</p>
-            {question.options.map((option, i) => (
-              <label className="answer-option" key={i}>
-                <input
-                  type="radio"
-                  name="answer"
-                  checked={response.answer === i}
-                  onChange={() => change({ answer: i })}
-                />{' '}
-                {option}
-              </label>
-            ))}
-            <button
-              onClick={() => change({ answer: null })}
-              disabled={response.answer === null}
-            >
-              Clear answer
-            </button>
-            <button
-              aria-pressed={response.flagged}
-              onClick={() => change({ flagged: !response.flagged })}
-            >
-              {response.flagged ? 'Remove flag' : 'Flag question'}
-            </button>
-          </fieldset>
-          <button disabled={!index} onClick={() => setIndex(index - 1)}>
-            Previous
-          </button>
-          <button
-            disabled={index + 1 >= initial.questions.length}
-            onClick={() => setIndex(index + 1)}
-          >
-            Next
-          </button>
-          {calculator && <Calculator />}
-          <details>
-            <summary>Scratchpad</summary>
-            <label>
-              Exam notes
-              <textarea
-                maxLength={12000}
-                value={scratchpad}
-                disabled={disabled}
-                onChange={(e) => {
-                  setScratchpad(e.target.value)
-                  enqueue('scratchpad', {
-                    path: '/scratchpad',
-                    data: { scratchpad: e.target.value },
-                  })
-                }}
-              />
-            </label>
-          </details>
-          <button disabled={disabled} onClick={() => setReview(true)}>
-            Review and submit
-          </button>
-          {review && (
-            <div
-              className="workspace-review"
-              role="region"
-              aria-label="Review before submission"
-            >
-              <p>
-                {answered} answered · {initial.questions.length - answered}{' '}
-                unanswered · {flagged} flagged
-              </p>
-              <button
-                disabled={disabled}
-                onClick={() =>
-                  void run(async () => {
-                    setSubmitting(true)
-                    try {
-                      if (!(await flush()))
-                        throw Error(
-                          'Pending changes could not be confirmed. Retry saves or reload saved work before submitting.',
-                        )
-                      setReceipt(
-                        await api<Attempt>(endpoint + '/submit', 'POST', {
-                          revision: revision.current,
-                        }),
-                      )
-                    } finally {
-                      setSubmitting(false)
-                    }
-                  })
-                }
-              >
-                Confirm submission
+        </aside>
+
+        <div className="question-panel">
+          <article className="question-body" ref={questionPane}>
+            {question && (
+              <fieldset className="question-fieldset" disabled={disabled}>
+                <legend>Question {index + 1} <span>of {total}</span></legend>
+                <p className="question-stem">{question.stem}</p>
+                <p className="answer-instruction">Select one answer</p>
+                {question.options.map((option, i) => (
+                  <label className="answer-option" key={i}>
+                    <input type="radio" name="answer" checked={response.answer === i}
+                      onChange={() => change({ answer: i })} />
+                    <span className="option-letter" aria-hidden="true">{String.fromCharCode(65 + i)}</span>
+                    <span>{option}</span>
+                    <Icon name="check" className="option-check" />
+                  </label>
+                ))}
+                <div className="question-actions">
+                  <button className="button-quiet" disabled={response.answer === null}
+                    onClick={() => change({ answer: null })}>Clear answer</button>
+                  <button className="button-quiet" aria-pressed={response.flagged}
+                    onClick={() => change({ flagged: !response.flagged })}>
+                    <Icon name="flag" />{response.flagged ? 'Remove flag' : 'Flag question'}
+                  </button>
+                </div>
+              </fieldset>
+            )}
+          </article>
+          <footer className="question-footer">
+            <div className="question-pagination">
+              <button className="button-secondary" disabled={!index} onClick={() => selectQuestion(index - 1)}>
+                <Icon name="left" /> Previous
               </button>
-              <button disabled={submitting} onClick={() => setReview(false)}>
-                Back to questions
+              <button disabled={index + 1 >= total} onClick={() => selectQuestion(index + 1)}>
+                Next <Icon name="right" />
               </button>
-              {error && <p role="alert">{error}</p>}
+            </div>
+            <button className="button-quiet submit-trigger" disabled={disabled} onClick={() => reviewDialog.current?.showModal()}>
+              <Icon name="check" /> Review and submit
+            </button>
+          </footer>
+        </div>
+
+        <aside className="workspace-tools" aria-label="Exam tools">
+          <nav className="tool-tabs" aria-label="Exam tools">
+            {references && <button aria-pressed={tool === 'references'} onClick={() => setTool('references')}>
+              <Icon name="book" /> References
+            </button>}
+            {calculator && <button aria-pressed={tool === 'calculator'} onClick={() => setTool('calculator')}>
+              <Icon name="calculator" /> Calculator
+            </button>}
+            <button aria-pressed={tool === 'notes'} onClick={() => setTool('notes')}>
+              <Icon name="edit" /> Scratchpad
+            </button>
+            {tool === 'references' && <button className="reference-width icon-button"
+              aria-label={wideReference ? 'Restore reference panel width' : 'Widen reference panel'}
+              title={wideReference ? 'Restore reference panel width' : 'Widen reference panel'}
+              onClick={() => setWideReference((current) => !current)}>
+              <Icon name={wideReference ? 'shrink' : 'expand'} />
+            </button>}
+          </nav>
+          {references && (
+            <div className="tool-content reference-tool" hidden={tool !== 'references'}>
+              <Resources path={path + '/references'} />
             </div>
           )}
-        </div>
-        {references && (
-          <div
-            className={
-              'workspace-references ' +
-              (panel === 'references' ? 'panel-active' : '')
-            }
-          >
-            <Resources path={path + '/references'} />
+          {calculator && (
+            <div className="tool-content" hidden={tool !== 'calculator'}>
+              <Calculator />
+            </div>
+          )}
+          <div className="tool-content" hidden={tool !== 'notes'}>
+            <h2>Scratchpad</h2>
+            <nav className="scratch-tabs" aria-label="Scratchpad mode">
+              <button aria-pressed={scratchTool === 'text'} onClick={() => setScratchTool('text')}>Notes</button>
+              <button aria-pressed={scratchTool === 'draw'} onClick={() => setScratchTool('draw')}>Sketch</button>
+            </nav>
+            <div hidden={scratchTool !== 'text'}>
+              <label>
+                Exam notes
+                <textarea maxLength={12000} value={scratchpad} disabled={disabled}
+                  placeholder="Write calculations or notes here…"
+                  onChange={(e) => {
+                    setScratchpad(e.target.value)
+                    enqueue('scratchpad', {
+                      path: '/scratchpad',
+                      data: { scratchpad: e.target.value },
+                    })
+                  }} />
+              </label>
+              <p className="muted scratch-hint">Notes save automatically and are available across questions.</p>
+            </div>
+            <div hidden={scratchTool !== 'draw'}><Sketchpad disabled={disabled} /></div>
           </div>
-        )}
+        </aside>
       </div>
+      <footer className="workspace-progress">
+        <progress value={answered} max={total || 1} aria-label="Questions answered" />
+        <strong>{answered} / {total}</strong> answered
+        <span><Icon name="flag" /> {flagged} flagged</span>
+      </footer>
+      <dialog ref={reviewDialog} className="workspace-review" aria-labelledby="review-title"
+        onCancel={(e) => { if (submitting) e.preventDefault() }}>
+          <div role="region" aria-label="Review before submission">
+            <h2 id="review-title">Review before submission</h2>
+            <p>{answered} answered · {total - answered} unanswered · {flagged} flagged</p>
+            <div className="review-actions">
+              <button className="button-secondary" disabled={submitting}
+                onClick={() => reviewDialog.current?.close()}>Back to questions</button>
+              <button disabled={disabled} onClick={() => void run(async () => {
+                setSubmitting(true)
+                try {
+                  if (!(await flush()))
+                    throw Error('Pending changes could not be confirmed. Retry saves or reload saved work before submitting.')
+                  setReceipt(await api<Attempt>(endpoint + '/submit', 'POST', {
+                    revision: revision.current,
+                  }))
+                } finally {
+                  setSubmitting(false)
+                }
+              })}>Confirm submission</button>
+            </div>
+            {error && <p role="alert">{error}</p>}
+          </div>
+      </dialog>
     </div>
   )
 }

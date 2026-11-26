@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { api, useResource, useAction } from '../../app/api'
-import { Viewer } from './Viewer'
+import { Icon } from '../../app/Icon'
+
+const Viewer = lazy(() =>
+  import('./Viewer').then((module) => ({ default: module.Viewer })),
+)
 
 export type Reference = {
   id: number
@@ -23,7 +27,7 @@ export function Resources({ path }: { path: string }) {
   const { data, error } = useResource<Reference[]>(path)
   const [query, setQuery] = useState('')
   const [search, submit] = useState<string>()
-  const [selected, open] = useState<{
+  const [selection, open] = useState<{
     id: number
     page: number
     sequence: number
@@ -39,7 +43,9 @@ export function Resources({ path }: { path: string }) {
     markRefresh,
   )
   const { run: markAction, busy: markBusy, error: markError } = useAction()
+  const selected = selection ?? (data?.[0] && { id: data[0].id, page: 1, sequence: 0 })
   const selectedDoc = data?.find((d) => d.id === selected?.id)
+  const currentMark = marks.data?.find((m) => m.version_id === selectedDoc?.id && m.page === activePage)
   function jump(id: number, page: number) {
     setActivePage(page)
     open((s) => ({ id, page, sequence: (s?.sequence ?? 0) + 1 }))
@@ -49,16 +55,16 @@ export function Resources({ path }: { path: string }) {
   if (!data.length) return <p>No references selected.</p>
   return (
     <div className="reference-panel">
-      <h3>Exam references</h3>
-      <div className="reference-actions">
-        {data.map((d) => (
-          <button key={d.id} onClick={() => jump(d.id, 1)}>
-            {d.title} · v{d.number} · {d.status}
-          </button>
-        ))}
-      </div>
+      <label className="reference-select">
+        <span><Icon name="file" /> Reference document</span>
+        <select value={selected?.id} onChange={(event) => jump(Number(event.target.value), 1)}>
+          {data.map((d) => (
+            <option key={d.id} value={d.id}>{d.title} · v{d.number}{d.status === 'view-only' ? ' · View only' : ''}</option>
+          ))}
+        </select>
+      </label>
       <form
-        className="reference-toolbar"
+        className="reference-toolbar reference-search"
         onSubmit={(e) => {
           e.preventDefault()
           submit(query.trim())
@@ -66,15 +72,16 @@ export function Resources({ path }: { path: string }) {
         }}
       >
         <label>
-          Search all permitted PDFs
+          <span className="sr-only">Search all permitted PDFs</span>
           <input
             type="search"
             maxLength={160}
+            placeholder="Search all permitted PDFs"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
-        <button>Search references</button>
+        <button className="button-secondary icon-button" aria-label="Search references" title="Search references"><Icon name="search" /></button>
       </form>
       {search === '' && <p>Enter a keyword.</p>}
       {search && (
@@ -85,15 +92,21 @@ export function Resources({ path }: { path: string }) {
             new URLSearchParams({ q: search, offset: String(offset) })
           }
           jump={jump}
+          clear={() => {
+            submit(undefined)
+            setQuery('')
+          }}
           offset={offset}
           paginate={paginate}
         />
       )}
-      <details>
-        <summary>Bookmarks and pinned pages</summary>
-        {!marks.data?.length && <p>No saved pages.</p>}
+      <details className="reference-bookmarks">
+        <summary><Icon name="bookmark" /> Bookmarks and pinned pages {marks.data?.length ? <span>{marks.data.length}</span> : null}</summary>
+        {marks.data && !marks.data.length && <p className="muted">No saved pages.</p>}
+        {!marks.data && !marks.error && <p role="status">Loading saved pages…</p>}
         {data.map((d) => {
-          const saved = marks.data?.filter((m) => m.version_id === d.id) ?? []
+          const saved = marks.data?.filter((m) => m.version_id === d.id)
+            .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.page - b.page) ?? []
           if (!saved.length) return null
           return (
             <div key={d.id}>
@@ -101,11 +114,12 @@ export function Resources({ path }: { path: string }) {
               <ul>
                 {saved.map((m) => (
                   <li key={m.page}>
-                    <button onClick={() => jump(d.id, m.page)}>
+                    <button className="button-quiet" onClick={() => jump(d.id, m.page)}>
                       {m.name || 'Page ' + m.page}
                       {m.pinned ? ' · pinned' : ''}
                     </button>
                     <button
+                      className="button-secondary"
                       disabled={markBusy}
                       onClick={() =>
                         void markAction(async () => {
@@ -121,6 +135,7 @@ export function Resources({ path }: { path: string }) {
                       {m.pinned ? 'Unpin' : 'Pin'}
                     </button>
                     <button
+                      className="button-quiet"
                       disabled={markBusy}
                       onClick={() =>
                         void markAction(async () => {
@@ -142,49 +157,57 @@ export function Resources({ path }: { path: string }) {
         })}
       </details>
       {(marks.error || markError) && (
-        <p role="alert">{marks.error || markError}</p>
+        <div>
+          <p role="alert">{marks.error || markError}</p>
+          {marks.error && (
+            <button className="button-secondary" onClick={() => reloadMarks((n) => n + 1)}>
+              Retry saved pages
+            </button>
+          )}
+        </div>
       )}
-      {selectedDoc && (
-        <form
-          className="reference-toolbar"
-          onSubmit={(e) => {
-            e.preventDefault()
-            const form = e.currentTarget
-            const fields = new FormData(form)
-            void markAction(async () => {
-              await api(
-                path + '/marks/' + selectedDoc.id + '/' + activePage,
-                'PUT',
-                {
-                  name: String(fields.get('name') ?? ''),
-                  pinned: fields.has('pin'),
-                },
-              )
-              form.reset()
-              reloadMarks((n) => n + 1)
-            })
-          }}
-        >
-          <label>
-            Bookmark name
-            <input name="name" maxLength={100} />
-          </label>
-          <label>
-            <input type="checkbox" name="pin" /> Pin page
-          </label>
-          <button disabled={markBusy}>Bookmark page {activePage}</button>
-        </form>
-      )}
-      {selected && selectedDoc && (
-        <Viewer
-          key={selected.sequence}
-          title={selectedDoc.title}
-          initialPage={selected.page}
-          focusOnOpen
-          onPage={setActivePage}
-          allowExport={exportPolicy.data?.allowed === true}
-          url={'/api' + path + '/' + selected.id + '/file'}
-        />
+      {selectedDoc && selected && (
+        <Suspense fallback={<p role="status">Loading PDF reader…</p>}>
+          <Viewer
+            key={selectedDoc.id}
+            title={selectedDoc.title}
+            navigation={selected}
+            focusOnOpen={!!selected.sequence}
+            onPage={setActivePage}
+            allowExport={exportPolicy.data?.allowed === true}
+            url={'/api' + path + '/' + selected.id + '/file'}
+            tools={marks.data && (
+              <details className="bookmark-editor" key={activePage}>
+                <summary>
+                  <Icon name="bookmark" /> {currentMark ? 'Edit bookmark' : 'Bookmark page ' + activePage}
+                </summary>
+                <form
+                  className="reference-toolbar mark-form"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const fields = new FormData(e.currentTarget)
+                    void markAction(async () => {
+                      await api(path + '/marks/' + selectedDoc.id + '/' + activePage, 'PUT', {
+                        name: String(fields.get('name') ?? ''),
+                        pinned: fields.has('pin'),
+                      })
+                      reloadMarks((n) => n + 1)
+                    })
+                  }}
+                >
+                  <label>
+                    Bookmark name
+                    <input name="name" maxLength={100} defaultValue={currentMark?.name} placeholder={`Page ${activePage}`} />
+                  </label>
+                  <label>
+                    <input type="checkbox" name="pin" defaultChecked={currentMark?.pinned} /> Pin page
+                  </label>
+                  <button disabled={markBusy}>{currentMark ? 'Update bookmark' : 'Save bookmark'}</button>
+                </form>
+              </details>
+            )}
+          />
+        </Suspense>
       )}
     </div>
   )
@@ -192,18 +215,18 @@ export function Resources({ path }: { path: string }) {
 function Hits({
   path,
   jump,
+  clear,
   offset,
   paginate,
 }: {
   path: string
   jump: (id: number, page: number) => void
+  clear: () => void
   offset: number
   paginate: (n: number) => void
 }) {
   const result =
     useResource<(Reference & { page: number; snippet: string })[]>(path)
-  if (result.error) return <p role="alert">{result.error}</p>
-  if (!result.data) return <p>Searching…</p>
   return (
     <div
       className="reference-hits"
@@ -211,10 +234,16 @@ function Hits({
       aria-label="Reference search results"
       tabIndex={0}
     >
-      {!result.data.length && <p>No matching pages.</p>}
-      {result.data.map((h) => (
+      <div className="reference-hit-heading">
+        <strong>Search results</strong>
+        <button className="button-quiet icon-button" aria-label="Clear search" title="Clear search" onClick={clear}><Icon name="close" /></button>
+      </div>
+      {result.error && <p role="alert">{result.error}</p>}
+      {!result.data && !result.error && <p role="status">Searching…</p>}
+      {result.data?.length === 0 && <p>No matching pages.</p>}
+      {result.data?.map((h) => (
         <div key={h.id + '-' + h.page}>
-          <button onClick={() => jump(h.id, h.page)}>
+          <button className="button-quiet" onClick={() => jump(h.id, h.page)}>
             {h.title} · page {h.page}
           </button>
           <p>{h.snippet}</p>
@@ -223,7 +252,7 @@ function Hits({
       {offset > 0 && (
         <button onClick={() => paginate(offset - 30)}>Previous results</button>
       )}
-      {result.data.length === 30 && (
+      {result.data?.length === 30 && (
         <button onClick={() => paginate(offset + 30)}>More results</button>
       )}
     </div>
@@ -411,12 +440,14 @@ export function Library({ cid }: { cid: number }) {
         ))}
       </div>
       {preview && (
-        <Viewer
-          key={preview.id}
-          url={'/api' + path + '/' + preview.id + '/file'}
-          title={preview.title}
-          focusOnOpen
-        />
+        <Suspense fallback={<p role="status">Loading PDF reader…</p>}>
+          <Viewer
+            key={preview.id}
+            url={'/api' + path + '/' + preview.id + '/file'}
+            title={preview.title}
+            focusOnOpen
+          />
+        </Suspense>
       )}
     </article>
   )

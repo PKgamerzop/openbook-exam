@@ -4,6 +4,7 @@ import { Student } from '../features/exam/Student'
 import { Diagnostics } from './App'
 import { navigate } from './route'
 import { ApiError, api, useAction } from './api'
+import { Icon } from './Icon'
 
 type User = { id: number; role: 'lecturer' | 'student'; username: string }
 export function Portal() {
@@ -58,12 +59,15 @@ export function Portal() {
                 navigate('/')
               }}
             >
+              <span className="brand-icon"><Icon name="book" /></span>
               OpenBook
             </a>
-            <span>
-              {user.username} · {user.role}
-            </span>
+            <div className="session-identity">
+              <span className="session-avatar" aria-hidden="true">{user.username.slice(0, 1).toUpperCase()}</span>
+              <div><strong>{user.username}</strong><small>{user.role}</small></div>
+            </div>
             <button
+              className="button-secondary sign-out"
               disabled={busy}
               onClick={() =>
                 void run(async () => {
@@ -73,54 +77,60 @@ export function Portal() {
                 })
               }
             >
-              Sign out
+              <Icon name="logout" /> Sign out
             </button>
           </header>
           {user.role === 'lecturer' ? <Lecturer /> : <Student />}
         </>
       ) : (
-        <section className="sign-in">
-          <h1>OpenBook</h1>
-          <p className="description">Computer-based open-book examinations</p>
-          <h2>Sign in</h2>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              void run(async () => {
-                const u = await api<User>('/login', 'POST', {
-                  username,
-                  password,
+        <div className="sign-in-layout">
+          <aside className="sign-in-brand">
+            <div className="wordmark"><span className="brand-icon"><Icon name="book" /></span> OpenBook</div>
+            <div className="sign-in-copy"><p>Examination portal</p><span>Computer-based open-book examinations</span></div>
+            <Icon name="book" className="sign-in-illustration" />
+          </aside>
+          <section className="sign-in">
+            <h1>Sign in</h1>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                void run(async () => {
+                  const u = await api<User>('/login', 'POST', {
+                    username,
+                    password,
+                  })
+                  setPassword('')
+                  setUser(u)
                 })
-                setPassword('')
-                setUser(u)
-              })
-            }}
-          >
-            <label>
-              Username
-              <input
-                required
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </label>
-            <label>
-              Password
-              <input
-                required
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
-            <button disabled={busy}>Sign in</button>
-          </form>
-          <Diagnostics />
-        </section>
+              }}
+            >
+              <label>
+                Username
+                <input
+                  required
+                  autoComplete="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  required
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </label>
+              <button disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}<Icon name="right" /></button>
+            </form>
+            {error && <p role="alert">{error}</p>}
+            <Diagnostics />
+          </section>
+        </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {user && error && <p className="session-error" role="alert">{error}</p>}
     </>
   )
 }

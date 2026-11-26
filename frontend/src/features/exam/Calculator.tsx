@@ -74,60 +74,59 @@ export function calculate(expression: string, degrees: boolean): number {
   return value
 }
 
+const keys = [
+  ['sin', 'sin('], ['cos', 'cos('], ['tan', 'tan('], ['√', 'sqrt('], ['xʸ', '^'],
+  ['log', 'log('], ['ln', 'ln('], ['(', '('], [')', ')'], ['÷', '/'],
+  ['7', '7'], ['8', '8'], ['9', '9'], ['π', 'pi'], ['×', '*'],
+  ['4', '4'], ['5', '5'], ['6', '6'], ['0', '0'], ['−', '-'],
+  ['1', '1'], ['2', '2'], ['3', '3'], ['.', '.'], ['+', '+'],
+]
+
 export function Calculator() {
   const [expression, setExpression] = useState('')
   const [degrees, setDegrees] = useState(true)
   const [result, setResult] = useState('')
   return (
-    <details>
-      <summary>Scientific calculator</summary>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          try {
-            setResult(String(calculate(expression, degrees)))
-          } catch (error) {
-            setResult((error as Error).message)
-          }
-        }}
-      >
+    <form className="calculator" onSubmit={(e) => {
+      e.preventDefault()
+      try {
+        setResult(String(calculate(expression, degrees)))
+      } catch (error) {
+        setResult((error as Error).message)
+      }
+    }}>
+      <h2>Scientific calculator</h2>
+      <label>
+        Expression
+        <input value={expression} maxLength={160} autoComplete="off" spellCheck={false}
+          onChange={(e) => setExpression(e.target.value)} />
+      </label>
+      <output aria-live="polite" className="calculator-output">{result}</output>
+      <div className="calculator-actions">
         <label>
-          Expression
-          <input
-            value={expression}
-            maxLength={160}
-            onChange={(e) => setExpression(e.target.value)}
-          />
-        </label>
-        <p>Functions: sqrt, log, ln, sin, cos, tan. Powers use ^.</p>
-        <label>
-          Angle units
-          <select
-            value={degrees ? 'degrees' : 'radians'}
-            onChange={(e) => setDegrees(e.target.value === 'degrees')}
-          >
+          <span className="sr-only">Angle units</span>
+          <select value={degrees ? 'degrees' : 'radians'} onChange={(e) => setDegrees(e.target.value === 'degrees')}>
             <option value="degrees">Degrees</option>
             <option value="radians">Radians</option>
           </select>
         </label>
-        <button>Calculate</button>
-        <button
-          type="button"
-          onClick={() => setExpression(expression.slice(0, -1))}
-        >
+        <button type="button" className="button-quiet" onClick={() => setExpression(expression.slice(0, -1))}>
           Backspace
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            setExpression('')
-            setResult('')
-          }}
-        >
-          Clear
-        </button>
-        <output aria-live="polite">{result}</output>
-      </form>
-    </details>
+        <button type="button" className="button-quiet" onClick={() => {
+          setExpression('')
+          setResult('')
+        }}>Clear</button>
+      </div>
+      <div className="calculator-keys">
+        {keys.map(([label, value]) => (
+          <button type="button" className="button-secondary" key={value}
+            onClick={() => setExpression((current) => current.length + value.length <= 160 ? current + value : current)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <button className="calculator-submit" disabled={!expression.trim()}>Calculate</button>
+    </form>
   )
 }

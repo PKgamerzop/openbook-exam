@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { navigate } from '../../app/route'
 import { api, useAction, useResource } from '../../app/api'
+import { Icon } from '../../app/Icon'
 import {
   localTime,
   moveQuestion,
@@ -93,17 +94,19 @@ export function Editor({
     )
   }
   return (
-    <section>
+    <section className="exam-editor">
       <button
+        className="button-quiet"
         onClick={() => {
           if (!dirty || window.confirm('Discard unsaved edits?')) back()
         }}
       >
-        Back to course
+        <Icon name="left" /> Back to course
       </button>
-      <h2>{draft.title}</h2>
+      <h1>{draft.title}</h1>
       {exam.published_number && (
         <button
+          className="button-secondary"
           onClick={() => {
             if (!dirty || window.confirm('Discard unsaved edits?'))
               navigate(window.location.pathname + '/results')
@@ -133,7 +136,7 @@ export function Editor({
           apply={(i, stem) => question(i, { stem })}
         />
       )}
-      <fieldset disabled={busy || exam.frozen}>
+      <fieldset className="editor-settings" disabled={busy || exam.frozen}>
         <legend>Exam settings</legend>
         <label>
           Exam title
@@ -255,7 +258,7 @@ export function Editor({
           ))}
         </fieldset>
         {draft.questions.map((q, i) => (
-          <fieldset key={i}>
+          <fieldset className="editor-question" key={i}>
             <legend>Question {i + 1} · 1 point</legend>
             <label>
               Question stem
@@ -273,7 +276,7 @@ export function Editor({
               />
             </label>
             {q.options.map((option, j) => (
-              <div key={j}>
+              <div className="editor-option" key={j}>
                 <label>
                   Option {j + 1}
                   <input
@@ -297,6 +300,7 @@ export function Editor({
                   Correct option {j + 1}
                 </label>
                 <button
+                  className="button-quiet"
                   disabled={q.options.length <= 2}
                   onClick={() =>
                     question(i, {
