@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
+import { Icon } from '../../app/Icon'
 import {
   getDocument,
   GlobalWorkerOptions,
@@ -6,6 +7,7 @@ import {
 } from 'pdfjs-dist'
 import {
   EventBus,
+  FindState,
   PDFViewer,
   PDFLinkService,
   PDFFindController,
@@ -45,10 +47,12 @@ function Thumbnail({
   doc,
   page,
   jump,
+  selected,
 }: {
   doc: PDFDocumentProxy
   page: number
   jump: () => void
+  selected: boolean
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
@@ -76,7 +80,7 @@ function Thumbnail({
     }
   }, [doc, page])
   return (
-    <button onClick={jump}>
+    <button onClick={jump} aria-current={selected ? 'page' : undefined}>
       <canvas ref={canvas} aria-hidden="true" />
       Page {page}
     </button>
@@ -86,14 +90,16 @@ function Thumbnail({
 export function Viewer({
   url,
   title,
-  initialPage = 1,
+  navigation,
+  tools,
   onPage,
   allowExport = true,
   focusOnOpen = false,
 }: {
   url: string
   title: string
-  initialPage?: number
+  navigation?: { page: number; sequence: number }
+  tools?: ReactNode
   onPage?: (page: number) => void
   allowExport?: boolean
   focusOnOpen?: boolean
@@ -106,8 +112,9 @@ export function Viewer({
     events: EventBus
   }>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy>()
-  const [page, setPage] = useState(initialPage)
+  const [page, setPage] = useState(navigation?.page ?? 1)
   const [scale, setScale] = useState(100)
+  const [zoomPreset, setZoomPreset] = useState<string>()
   const [error, setError] = useState('')
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [query, setQuery] = useState('')
@@ -115,12 +122,14 @@ export function Viewer({
   const [outline, setOutline] = useState<Outline>([])
   const [sidebar, setSidebar] = useState('')
   const [expanded, setExpanded] = useState(false)
+  const requestedPage = useEffectEvent(() => navigation?.page ?? 1)
+  const expandedButton = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!focusOnOpen) return
     root.current?.focus({ preventScroll: true })
     root.current?.scrollIntoView({ block: 'nearest' })
-  }, [focusOnOpen])
+  }, [focusOnOpen, navigation?.sequence])
 
   useEffect(() => {
     const element = container.current!
@@ -140,29 +149,32 @@ export function Viewer({
     links.setViewer(viewer)
     const resize = new ResizeObserver(() => {
       const fit = viewer.currentScaleValue
-      if (element.clientWidth && viewer.pagesCount && (fit === 'page-width' || fit === 'page-fit')) {
+      if (element.clientWidth && element.clientHeight && viewer.pagesCount && (fit === 'page-width' || fit === 'page-fit')) {
         viewer.currentScaleValue = fit
       }
     })
     resize.observe(element)
     const init = () => {
       viewer.currentScaleValue = 'page-width'
-      viewer.currentPageNumber = Math.min(initialPage, viewer.pagesCount)
+      viewer.currentPageNumber = Math.min(requestedPage(), viewer.pagesCount)
     }
     const updatePage = ({ pageNumber }: { pageNumber: number }) =>
       setPage(pageNumber)
-    const updateScale = ({ scale }: { scale: number }) =>
+    const updateScale = ({ scale, presetValue }: { scale: number; presetValue?: string }) => {
       setScale(Math.round(scale * 100))
+      setZoomPreset(presetValue === 'page-fit' || presetValue === 'page-width' ? presetValue : undefined)
+    }
     const updateHits = ({
       matchesCount,
+      state,
     }: {
       matchesCount?: { current: number; total: number }
-    }) =>
-      setHits(
-        matchesCount?.total
-          ? `${matchesCount.current} of ${matchesCount.total}`
-          : 'No matches',
-      )
+      state?: number
+    }) => {
+      if (state === FindState.PENDING) setHits('Finding…')
+      else if (matchesCount?.total) setHits(`${matchesCount.current} of ${matchesCount.total}`)
+      else if (state === FindState.NOT_FOUND) setHits('No matches')
+    }
     events.on('pagesinit', init)
     events.on('pagechanging', updatePage)
     events.on('scalechanging', updateScale)
@@ -195,7 +207,36 @@ export function Viewer({
       instance.current = null
       void loading.destroy()
     }
-  }, [url, initialPage, loadAttempt])
+  }, [url, loadAttempt])
+
+  useEffect(() => {
+    const viewer = instance.current?.viewer
+    if (navigation && viewer?.getPageView(navigation.page - 1))
+      viewer.scrollPageIntoView({ pageNumber: navigation.page })
+  }, [navigation])
+
+  useEffect(() => {
+    if (!expanded) return
+    const hidden: HTMLElement[] = []
+    for (let child = root.current; child && child !== document.body; child = child.parentElement) {
+      for (const sibling of child.parentElement?.children ?? []) {
+        if (sibling !== child && sibling instanceof HTMLElement && !sibling.inert) {
+          sibling.inert = true
+          hidden.push(sibling)
+        }
+      }
+    }
+    function close(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      setExpanded(false)
+      expandedButton.current?.focus()
+    }
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('keydown', close)
+      for (const element of hidden) element.inert = false
+    }
+  }, [expanded])
 
   useEffect(() => {
     onPage?.(page)
@@ -235,176 +276,121 @@ export function Viewer({
       ref={root}
       tabIndex={focusOnOpen ? -1 : undefined}
       aria-label={title + ' PDF reader'}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') setExpanded(false)
-      }}
+      role={expanded ? 'dialog' : undefined}
+      aria-modal={expanded || undefined}
     >
-      <h3>{title}</h3>
+      <div className="reader-heading">
+        <h3>{title}</h3>
+        <button type="button" ref={expandedButton} className="button-quiet icon-button"
+          aria-label={expanded ? 'Exit expanded reader' : 'Expand reader'}
+          title={expanded ? 'Exit expanded reader' : 'Expand reader'}
+          aria-pressed={expanded} onClick={() => setExpanded((value) => !value)}>
+          <Icon name={expanded ? 'shrink' : 'expand'} />
+        </button>
+      </div>
       {allowExport && doc && (
         <div className="reader-export">
-          <a href={url} target="_blank" rel="noreferrer">
-            Open printable PDF
-          </a>{' '}
-          <a href={url} download={title + '.pdf'}>
-            Download PDF
-          </a>
+          <a href={url} target="_blank" rel="noreferrer">Open printable PDF</a>
+          <a href={url} download={title + '.pdf'}>Download PDF</a>
         </div>
       )}
       {error && (
-        <div>
+        <div className="reader-message">
           <p role="alert">{error}</p>
-          <button
-            type="button"
-            onClick={() => {
-              setError('')
-              setLoadAttempt((attempt) => attempt + 1)
-            }}
-          >
-            Retry PDF
-          </button>
+          <button onClick={() => {
+            setError('')
+            setLoadAttempt((attempt) => attempt + 1)
+          }}>Retry PDF</button>
         </div>
       )}
-      {!doc && !error && <p role="status">Loading PDF…</p>}
+      {!doc && !error && <p className="reader-message" role="status">Loading PDF…</p>}
       <fieldset className="reader-toolbar" disabled={!doc}>
-        <legend>PDF navigation</legend>
-        <button onClick={() => jump(page - 1)} disabled={page <= 1}>
-          Previous page
-        </button>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            jump(Number(new FormData(e.currentTarget).get('page')))
-          }}
-        >
-          <label>
-            Page{' '}
-            <input
-              key={page}
-              name="page"
-              type="number"
-              min={1}
-              max={doc?.numPages}
-              defaultValue={page}
-            />
-          </label>
-          <span>of {doc?.numPages ?? '…'}</span>
-          <button>Go</button>
-        </form>
-        <button
-          onClick={() => jump(page + 1)}
-          disabled={page >= (doc?.numPages ?? 0)}
-        >
-          Next page
-        </button>
-        <button onClick={() => zoom(scale / 125)} aria-label="Zoom out">
-          −
-        </button>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            zoom(Number(new FormData(e.currentTarget).get('zoom')) / 100)
-          }}
-        >
-          <label>
-            Zoom %{' '}
-            <input
-              key={scale}
-              name="zoom"
-              type="number"
-              min={25}
-              max={400}
-              defaultValue={scale}
-            />
-          </label>
-          <button>Apply zoom</button>
-        </form>
-        <button onClick={() => zoom(scale / 80)} aria-label="Zoom in">
-          +
-        </button>
-        <button onClick={() => zoom('page-width')}>Fit width</button>
-        <button onClick={() => zoom('page-fit')}>Fit page</button>
-        <button onClick={() => setExpanded((value) => !value)}>
-          {expanded ? 'Exit expanded reader' : 'Expand reader'}
-        </button>
+        <legend className="sr-only">PDF navigation</legend>
+        <div className="reader-controls">
+          <div className="reader-control-group">
+            <button className="button-quiet icon-button" onClick={() => jump(page - 1)}
+              disabled={page <= 1} aria-label="Previous page" title="Previous page"><Icon name="left" /></button>
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              jump(Number(new FormData(e.currentTarget).get('page')))
+            }}>
+              <label>
+                <span className="sr-only">Page</span>
+                <input key={page} name="page" type="number" min={1} max={doc?.numPages} defaultValue={page} />
+              </label>
+              <span>of {doc?.numPages ?? '…'}</span>
+              <button className="button-quiet">Go</button>
+            </form>
+            <button className="button-quiet icon-button" onClick={() => jump(page + 1)}
+              disabled={page >= (doc?.numPages ?? 0)} aria-label="Next page" title="Next page"><Icon name="right" /></button>
+          </div>
+          <div className="reader-control-group">
+            <button className="button-quiet icon-button" onClick={() => zoom(scale / 125)}
+              disabled={scale <= 25} aria-label="Zoom out" title="Zoom out"><Icon name="minus" /></button>
+            <label className="zoom-select">
+              <span className="sr-only">Zoom level</span>
+              <select value={zoomPreset ?? String(scale)} onChange={(e) => {
+                const value = e.target.value
+                zoom(Number.isNaN(Number(value)) ? value : Number(value) / 100)
+              }}>
+                <option value="page-width">Fit width</option>
+                <option value="page-fit">Fit page</option>
+                {[...new Set([scale, 50, 75, 100, 125, 150, 200, 300, 400])].sort((a, b) => a - b)
+                  .map((level) => <option key={level} value={level}>{level}%</option>)}
+              </select>
+            </label>
+            <button className="button-quiet icon-button" onClick={() => zoom(scale / 80)}
+              disabled={scale >= 400} aria-label="Zoom in" title="Zoom in"><Icon name="plus" /></button>
+          </div>
+        </div>
       </fieldset>
-      <form
-        className="reader-find"
-        onSubmit={(e) => {
-          e.preventDefault()
-          find('again')
-        }}
-      >
+      <form className="reader-find" onSubmit={(e) => {
+        e.preventDefault()
+        if (query.trim()) find('again')
+      }}>
         <label>
-          Find in this PDF
-          <input
-            value={query}
+          <span className="sr-only">Find in this PDF</span>
+          <input type="search" placeholder="Find in this PDF" value={query} disabled={!doc}
             onChange={(e) => {
               setQuery(e.target.value)
               setHits('')
-            }}
-          />
+              if (!e.target.value) instance.current?.events.dispatch('findbarclose', {})
+            }} />
         </label>
-        <button disabled={!doc || !query.trim()}>Next match</button>
-        <button
-          type="button"
-          disabled={!doc || !query.trim()}
-          onClick={() => find('again', true)}
-        >
-          Previous match
-        </button>
         <output aria-live="polite">{hits}</output>
+        <button className="button-quiet icon-button" type="button" disabled={!doc || !query.trim()}
+          onClick={() => find('again', true)} aria-label="Previous match" title="Previous match"><Icon name="left" /></button>
+        <button className="button-quiet icon-button" disabled={!doc || !query.trim()}
+          aria-label="Next match" title="Next match"><Icon name="right" /></button>
       </form>
-      <div className={sidebar ? "reader-panels sidebar-open" : "reader-panels"}>
-        <div className="reader-sidebar">
-          <button
-            aria-expanded={sidebar === 'pages'}
-            disabled={!doc}
-            onClick={() => setSidebar(sidebar === 'pages' ? '' : 'pages')}
-          >
-            Thumbnails
-          </button>
-          {!!outline.length && (
-            <button
-              aria-expanded={sidebar === 'outline'}
-              onClick={() => setSidebar(sidebar === 'outline' ? '' : 'outline')}
-            >
-              Outline
-            </button>
-          )}
+      <div className="reader-extras">
+        <button className="button-quiet" aria-expanded={sidebar === 'pages'} disabled={!doc}
+          onClick={() => setSidebar(sidebar === 'pages' ? '' : 'pages')}>
+          <Icon name="grid" /> Thumbnails
+        </button>
+        {!!outline.length && <button className="button-quiet" aria-expanded={sidebar === 'outline'}
+          onClick={() => setSidebar(sidebar === 'outline' ? '' : 'outline')}>Outline</button>}
+        {doc && tools}
+      </div>
+      <div className={sidebar ? 'reader-panels sidebar-open' : 'reader-panels'}>
+        {sidebar && <div className="reader-sidebar">
           {sidebar === 'pages' && doc && (
             <div className="reader-thumbnails">
               {Array.from({ length: doc.numPages }, (_, i) =>
                 Math.abs(page - i - 1) <= 6 ? (
-                  <Thumbnail
-                    key={i}
-                    doc={doc}
-                    page={i + 1}
-                    jump={() => jump(i + 1)}
-                  />
+                  <Thumbnail key={i} doc={doc} page={i + 1} selected={i + 1 === page} jump={() => jump(i + 1)} />
                 ) : (
-                  <button key={i} onClick={() => jump(i + 1)}>
-                    Page {i + 1}
-                  </button>
+                  <button key={i} onClick={() => jump(i + 1)}>Page {i + 1}</button>
                 ),
               )}
             </div>
           )}
-          {sidebar === 'outline' && (
-            <OutlineList
-              items={outline}
-              jump={(dest) => {
-                void instance.current?.links.goToDestination(dest)
-              }}
-            />
-          )}
-        </div>
+          {sidebar === 'outline' && <OutlineList items={outline} jump={(dest) => {
+            void instance.current?.links.goToDestination(dest)
+          }} />}
+        </div>}
         <div className="reader-scroll">
-          <div
-            className="pdf-scroll-container"
-            ref={container}
-            tabIndex={0}
-            aria-label={title + ' pages'}
-          >
+          <div className="pdf-scroll-container" ref={container} tabIndex={0} aria-label={title + ' pages'}>
             <div className="pdfViewer" />
           </div>
         </div>
